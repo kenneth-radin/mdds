@@ -12,7 +12,22 @@ const DATE_PATTERN =
 export const dateString = z.string().refine(
   (value) => {
     const trimmed = value.trim();
-    return DATE_PATTERN.test(trimmed) && Number.isFinite(Date.parse(trimmed));
+    if (!DATE_PATTERN.test(trimmed)) return false;
+
+    const dateOnly = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) {
+      const year = Number(dateOnly[1]);
+      const month = Number(dateOnly[2]);
+      const day = Number(dateOnly[3]);
+      const date = new Date(Date.UTC(year, month - 1, day));
+      // Rejects impossible calendar dates such as 2025-02-31, which Date
+      // silently rolls over to 2025-03-03.
+      return (
+        date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+      );
+    }
+
+    return Number.isFinite(Date.parse(trimmed));
   },
   { message: 'Expected an ISO 8601 datetime (2025-01-20T08:30:00.000Z) or a date (2025-01-20).' }
 );
