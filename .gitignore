@@ -26,3 +26,7 @@ vite.config.js
 vite.config.d.ts
 *.tsbuildinfo
 *.tsbuildinfo
+
+# Generated QR code for Expo Go (regenerate anytime)
+expo-qr.png
+
