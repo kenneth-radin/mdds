@@ -30,3 +30,4 @@ vite.config.d.ts
 # Generated QR code for Expo Go (regenerate anytime)
 expo-qr.png
 
+expo-qr-lan.png
