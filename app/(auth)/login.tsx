@@ -36,7 +36,7 @@ export default function LoginScreen() {
         <Button title={busy ? 'Signing in…' : 'Sign in'} onPress={submit} disabled={busy} />
       </Card>
       <Card>
-        <Subtitle>No account yet? Register the first account on an empty database and it becomes the administrator.</Subtitle>
+        <Subtitle>Don't have an account?</Subtitle>
         <Link href="/(auth)/register" asChild>
           <Button title="Create an account" variant="secondary" onPress={() => undefined} />
         </Link>

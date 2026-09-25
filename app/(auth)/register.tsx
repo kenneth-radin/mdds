@@ -27,7 +27,7 @@ export default function RegisterScreen() {
   return (
     <Screen>
       <Title>Create account</Title>
-      <Subtitle>On an empty database the first registered account becomes the administrator.</Subtitle>
+      <Subtitle>Create a new account to continue.</Subtitle>
       <Card>
         <Field label="Full name" value={form.name} onChangeText={set('name')} placeholder="Juan Dela Cruz" />
         <Field label="Email" value={form.email} onChangeText={set('email')} placeholder="you@example.com" keyboardType="email-address" />
