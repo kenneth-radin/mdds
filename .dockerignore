@@ -1,0 +1,16 @@
+# Dependencies / build output
+**/node_modules
+**/dist
+*.tsbuildinfo
+
+# Secrets must never enter the image
+**/.env
+**/.env.local
+
+# Repo metadata and non-backend assets
+.git
+src
+app
+components
+lib
+docs
