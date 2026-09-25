@@ -4,7 +4,7 @@ import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Badge, Button, Card, EmptyState, Field, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { FailureRecord } from '../../../../lib/types';
-import { fmtDate, splitCsv, toIsoOrNull } from '../../../../lib/format';
+import { fmtDate, isValidDateInput, splitCsv, toIsoOrNull } from '../../../../lib/format';
 
 const severities = ['minor', 'moderate', 'major', 'critical'] as const;
 
@@ -35,6 +35,14 @@ export default function FailureRecordsScreen() {
   const set = (key: keyof typeof form) => (value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const submit = async () => {
+    if (!form.failureMode.trim()) {
+      setError('Failure mode is required.');
+      return;
+    }
+    if (form.date.trim() && !isValidDateInput(form.date)) {
+      setError('Date must look like 2025-02-05.');
+      return;
+    }
     setBusy(true);
     setError('');
     setFeedback('');

@@ -8,6 +8,7 @@ import { asyncHandler, HttpError } from '../middleware/error';
 import { requireAuth } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { resolveMachine } from '../utils/helpers';
+import { dateString } from '../utils/dateSchema';
 
 const router = Router();
 router.use(requireAuth);
@@ -16,14 +17,14 @@ const machineRef = z.string().min(1);
 
 const maintenanceSchema = z.object({
   machine: machineRef,
-  date: z.string().datetime(),
+  date: dateString,
   maintenanceType: z.enum(['preventive', 'corrective', 'predictive', 'inspection', 'overhaul']),
   problem: z.string().min(1),
   action: z.string().min(1),
   partsReplaced: z.array(z.string()).optional(),
   technician: z.string().optional(),
-  startTime: z.string().datetime().nullable().optional(),
-  endTime: z.string().datetime().nullable().optional(),
+  startTime: dateString.nullable().optional(),
+  endTime: dateString.nullable().optional(),
   downtimeHours: z.number().min(0).optional(),
   cost: z.number().nullable().optional(),
   productionLossUnits: z.number().nullable().optional(),
@@ -35,7 +36,7 @@ const maintenanceSchema = z.object({
 
 const failureSchema = z.object({
   machine: machineRef,
-  date: z.string().datetime(),
+  date: dateString,
   failureMode: z.string().min(1),
   cause: z.string().optional(),
   symptoms: z.array(z.string()).optional(),
@@ -47,7 +48,7 @@ const failureSchema = z.object({
 
 const operationalSchema = z.object({
   machine: machineRef,
-  date: z.string().datetime(),
+  date: dateString,
   operatingHours: z.number().min(0).optional(),
   productionOutput: z.number().nullable().optional(),
   downtimeHours: z.number().min(0).optional(),

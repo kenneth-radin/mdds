@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "mdss",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.plant.mdss"

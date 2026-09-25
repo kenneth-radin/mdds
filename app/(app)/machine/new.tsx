@@ -3,7 +3,7 @@ import { Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Card, Field, Muted, Notice, Screen, Subtitle, Title } from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
-import { toIsoOrNull } from '../../../lib/format';
+import { isValidDateInput, toIsoOrNull } from '../../../lib/format';
 
 export default function NewMachineScreen() {
   const router = useRouter();
@@ -27,6 +27,22 @@ export default function NewMachineScreen() {
   const set = (key: keyof typeof form) => (value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const submit = async () => {
+    const missing = [
+      ['Machine ID', form.machineId],
+      ['Machine name', form.name],
+      ['Machine type', form.machineType]
+    ]
+      .filter(([, value]) => !value.trim())
+      .map(([label]) => label);
+
+    if (missing.length > 0) {
+      setError(`Please fill in: ${missing.join(', ')}.`);
+      return;
+    }
+    if (form.installationDate.trim() && !isValidDateInput(form.installationDate)) {
+      setError('Installation date must look like 2024-01-15.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {

@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Button, Card, EmptyState, KeyValue, Notice, Screen, Subtitle, Title } from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
@@ -40,14 +40,21 @@ export default function ReportsScreen() {
 
   const share = async (format: 'json' | 'csv') => {
     if (!report) return;
-    const content = format === 'json' ? JSON.stringify(report, null, 2) : rowsFromReport(report);
-    const uri = `${FileSystem.cacheDirectory}mdss-summary-report.${format}`;
-    await FileSystem.writeAsStringAsync(uri, content, { encoding: FileSystem.EncodingType.UTF8 });
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, {
-        mimeType: format === 'json' ? 'application/json' : 'text/csv',
-        dialogTitle: 'Share summary report'
-      });
+    try {
+      const content = format === 'json' ? JSON.stringify(report, null, 2) : rowsFromReport(report);
+      const file = new File(Paths.cache, `mdss-summary-report.${format}`);
+      file.create({ overwrite: true });
+      file.write(content);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, {
+          mimeType: format === 'json' ? 'application/json' : 'text/csv',
+          dialogTitle: 'Share summary report'
+        });
+      } else {
+        setError('Sharing is not available on this device.');
+      }
+    } catch (err) {
+      setError(errorMessage(err));
     }
   };
 

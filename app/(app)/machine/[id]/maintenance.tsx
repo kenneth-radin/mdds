@@ -4,7 +4,7 @@ import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Badge, Button, Card, EmptyState, Field, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { MaintenanceRecord } from '../../../../lib/types';
-import { fmtDate, splitCsv, toIsoOrNull } from '../../../../lib/format';
+import { fmtDate, isValidDateInput, splitCsv, toIsoOrNull } from '../../../../lib/format';
 
 const types = ['preventive', 'corrective', 'predictive', 'inspection', 'overhaul'] as const;
 
@@ -35,6 +35,14 @@ export default function MaintenanceHistoryScreen() {
   const set = (key: keyof typeof form) => (value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const submit = async () => {
+    if (!form.problem.trim() || !form.action.trim()) {
+      setError('Problem / symptoms and action taken are required.');
+      return;
+    }
+    if (form.date.trim() && !isValidDateInput(form.date)) {
+      setError('Date must look like 2025-01-20.');
+      return;
+    }
     setBusy(true);
     setError('');
     setFeedback('');

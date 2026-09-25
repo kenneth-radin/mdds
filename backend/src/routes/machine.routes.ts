@@ -9,6 +9,7 @@ import { asyncHandler, HttpError } from '../middleware/error';
 import { requireAuth } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { resolveMachine } from '../utils/helpers';
+import { dateString, parseDate } from '../utils/dateSchema';
 
 const router = Router();
 router.use(requireAuth);
@@ -22,21 +23,15 @@ const machineSchema = z.object({
   serialNumber: z.string().optional(),
   location: z.string().optional(),
   criticality: z.enum(['low', 'medium', 'high']).optional(),
-  installationDate: z.string().datetime().nullable().optional(),
+  installationDate: dateString.nullable().optional(),
   ratedPowerKw: z.number().nullable().optional(),
   ratedVoltage: z.number().nullable().optional(),
   ratedCurrent: z.number().nullable().optional(),
   designSpeedRpm: z.number().nullable().optional(),
   operatingHours: z.number().min(0).optional(),
-  lastMaintenanceDate: z.string().datetime().nullable().optional(),
+  lastMaintenanceDate: dateString.nullable().optional(),
   notes: z.string().optional()
 });
-
-function toDate(value?: string | null): Date | null {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? date : null;
-}
 
 router.get(
   '/machines',
@@ -66,8 +61,8 @@ router.post(
     if (exists) throw new HttpError(409, 'A machine with that machine ID already exists.');
     const machine = await Machine.create({
       ...body,
-      installationDate: toDate(body.installationDate),
-      lastMaintenanceDate: toDate(body.lastMaintenanceDate),
+      installationDate: parseDate(body.installationDate),
+      lastMaintenanceDate: parseDate(body.lastMaintenanceDate),
       createdBy: req.auth!.userId
     });
     res.status(201).json({ machine });
@@ -90,8 +85,8 @@ router.put(
     const body = req.body as Partial<z.infer<typeof machineSchema>>;
     Object.assign(machine, {
       ...body,
-      installationDate: body.installationDate === undefined ? machine.installationDate : toDate(body.installationDate),
-      lastMaintenanceDate: body.lastMaintenanceDate === undefined ? machine.lastMaintenanceDate : toDate(body.lastMaintenanceDate)
+      installationDate: body.installationDate === undefined ? machine.installationDate : parseDate(body.installationDate),
+      lastMaintenanceDate: body.lastMaintenanceDate === undefined ? machine.lastMaintenanceDate : parseDate(body.lastMaintenanceDate)
     });
     await machine.save();
     res.json({ machine });

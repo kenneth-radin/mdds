@@ -3,7 +3,7 @@ import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Badge, Button, Card, EmptyState, Field, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { OperationalRecord } from '../../../../lib/types';
-import { fmtDate } from '../../../../lib/format';
+import { fmtDate, isValidDateInput, toIsoOrNull } from '../../../../lib/format';
 
 export default function OperationalDataScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,13 +31,17 @@ export default function OperationalDataScreen() {
   const set = (key: keyof typeof form) => (value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const submit = async () => {
+    if (form.date.trim() && !isValidDateInput(form.date)) {
+      setError('Date must look like 2025-03-10.');
+      return;
+    }
     setBusy(true);
     setError('');
     setFeedback('');
     try {
       await api.post('/api/operational-data', {
         machine: id,
-        date: form.date ? new Date(form.date).toISOString() : new Date().toISOString(),
+        date: toIsoOrNull(form.date) || new Date().toISOString(),
         operatingHours: form.operatingHours ? Number(form.operatingHours) : 0,
         productionOutput: form.productionOutput ? Number(form.productionOutput) : null,
         downtimeHours: form.downtime ? Number(form.downtime) : 0,

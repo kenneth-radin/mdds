@@ -5,6 +5,7 @@ import { asyncHandler, HttpError } from '../middleware/error';
 import { requireAuth } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { buildCaseNumber, resolveMachine } from '../utils/helpers';
+import { dateString } from '../utils/dateSchema';
 import { loadMachineHistory } from '../services/historyService';
 import { analyzeMaintenanceCase } from '../services/analysisService';
 
@@ -16,7 +17,7 @@ const analyzeSchema = z.object({
   currentProblem: z.string().min(3),
   symptoms: z.array(z.string()).optional(),
   operatingHoursAtReport: z.number().nullable().optional(),
-  lastMaintenanceDate: z.string().datetime().nullable().optional(),
+  lastMaintenanceDate: dateString.nullable().optional(),
   urgency: z.enum(['low', 'medium', 'high']).optional()
 });
 

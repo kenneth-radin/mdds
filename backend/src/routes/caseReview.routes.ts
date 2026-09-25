@@ -6,6 +6,7 @@ import { asyncHandler, HttpError } from '../middleware/error';
 import { requireAuth } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { resolveMachine } from '../utils/helpers';
+import { dateString } from '../utils/dateSchema';
 import { runAnalysisForCase } from './case.routes';
 
 const router = Router();
@@ -23,7 +24,7 @@ const outcomeSchema = z.object({
   partsReplaced: z.array(z.string()).optional(),
   downtimeHours: z.number().min(0).nullable().optional(),
   technician: z.string().optional(),
-  performedOn: z.string().datetime().nullable().optional(),
+  performedOn: dateString.nullable().optional(),
   productionLossUnits: z.number().nullable().optional(),
   cost: z.number().nullable().optional(),
   notes: z.string().optional()
