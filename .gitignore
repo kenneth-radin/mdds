@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment / secrets
+.env
+.env.local
+backend/.env
+
+# Build output
+dist/
+_expo/
+.expo/
+
+# Logs
+*.log
+_dev.log
+_deverr.log
+_prev.log
+
+# Temp files
+*.tmp
+app.json.*
