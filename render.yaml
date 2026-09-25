@@ -1,0 +1,26 @@
+# Render Blueprint: MDSS REST API.
+# Render dashboard -> New -> Blueprint -> this repo picks it up automatically,
+# or configure the same values by hand (see README "Deploy on Render").
+services:
+  - type: web
+    name: mdds-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      # Provided by Render; keep in sync with the Atlas connection string.
+      - key: MONGODB_URI
+        sync: false
+      # Auto-generated strong secret (view/copy in the dashboard if needed).
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      # Mobile clients do not enforce CORS; tighten to a web origin if one is added later.
+      - key: CORS_ORIGIN
+        value: "*"
+      # PORT is injected automatically by Render.
+      - key: NODE_VERSION
+        value: 22.14.0
