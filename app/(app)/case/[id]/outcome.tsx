@@ -4,7 +4,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Button, Card, Field, Loading, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { MaintenanceCase } from '../../../../lib/types';
-import { splitCsv } from '../../../../lib/format';
+import { isValidNumberInput, splitCsv, toNumberOrNull } from '../../../../lib/format';
 
 const results = ['resolved', 'partially-resolved', 'not-resolved'] as const;
 
@@ -43,6 +43,22 @@ export default function CaseOutcomeScreen() {
   const set = (key: keyof typeof form) => (value: string) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const submit = async () => {
+    if (!form.actionTaken.trim()) {
+      setError('Action taken is required.');
+      return;
+    }
+    if (!isValidNumberInput(form.downtime)) {
+      setError('Downtime must be a number.');
+      return;
+    }
+    if (!isValidNumberInput(form.cost)) {
+      setError('Cost must be a number.');
+      return;
+    }
+    if (!isValidNumberInput(form.loss)) {
+      setError('Production loss must be a number.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -50,10 +66,10 @@ export default function CaseOutcomeScreen() {
         result,
         actionTaken: form.actionTaken.trim(),
         partsReplaced: splitCsv(form.parts),
-        downtimeHours: form.downtime ? Number(form.downtime) : null,
+        downtimeHours: toNumberOrNull(form.downtime),
         technician: form.technician.trim(),
-        cost: form.cost ? Number(form.cost) : null,
-        productionLossUnits: form.loss ? Number(form.loss) : null,
+        cost: toNumberOrNull(form.cost),
+        productionLossUnits: toNumberOrNull(form.loss),
         notes: form.notes.trim()
       });
       router.replace(`/(app)/case/${id}`);

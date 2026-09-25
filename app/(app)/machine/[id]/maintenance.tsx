@@ -4,7 +4,7 @@ import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Badge, Button, Card, EmptyState, Field, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { MaintenanceRecord } from '../../../../lib/types';
-import { fmtDate, isValidDateInput, splitCsv, toIsoOrNull } from '../../../../lib/format';
+import { fmtDate, isValidDateInput, isValidNumberInput, splitCsv, toIsoOrNull, toNumberOrNull } from '../../../../lib/format';
 
 const types = ['preventive', 'corrective', 'predictive', 'inspection', 'overhaul'] as const;
 
@@ -43,6 +43,18 @@ export default function MaintenanceHistoryScreen() {
       setError('Date must look like 2025-01-20.');
       return;
     }
+    if (!isValidNumberInput(form.downtime)) {
+      setError('Downtime must be a number.');
+      return;
+    }
+    if (!isValidNumberInput(form.cost)) {
+      setError('Cost must be a number.');
+      return;
+    }
+    if (!isValidNumberInput(form.loss)) {
+      setError('Production loss must be a number.');
+      return;
+    }
     setBusy(true);
     setError('');
     setFeedback('');
@@ -55,9 +67,9 @@ export default function MaintenanceHistoryScreen() {
         action: form.action.trim(),
         partsReplaced: splitCsv(form.parts),
         technician: form.technician.trim(),
-        downtimeHours: form.downtime ? Number(form.downtime) : 0,
-        cost: form.cost ? Number(form.cost) : null,
-        productionLossUnits: form.loss ? Number(form.loss) : null
+        downtimeHours: toNumberOrNull(form.downtime) ?? 0,
+        cost: toNumberOrNull(form.cost),
+        productionLossUnits: toNumberOrNull(form.loss)
       });
       setForm({ date: '', problem: '', action: '', parts: '', technician: '', downtime: '', cost: '', loss: '' });
       setFeedback('Maintenance record saved.');

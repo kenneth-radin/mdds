@@ -4,7 +4,7 @@ import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Badge, Button, Card, EmptyState, Field, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { FailureRecord } from '../../../../lib/types';
-import { fmtDate, isValidDateInput, splitCsv, toIsoOrNull } from '../../../../lib/format';
+import { fmtDate, isValidDateInput, isValidNumberInput, splitCsv, toIsoOrNull, toNumberOrNull } from '../../../../lib/format';
 
 const severities = ['minor', 'moderate', 'major', 'critical'] as const;
 
@@ -43,6 +43,10 @@ export default function FailureRecordsScreen() {
       setError('Date must look like 2025-02-05.');
       return;
     }
+    if (!isValidNumberInput(form.downtime)) {
+      setError('Downtime must be a number.');
+      return;
+    }
     setBusy(true);
     setError('');
     setFeedback('');
@@ -54,7 +58,7 @@ export default function FailureRecordsScreen() {
         cause: form.cause.trim(),
         symptoms: splitCsv(form.symptoms),
         severity,
-        downtimeHours: form.downtime ? Number(form.downtime) : 0,
+        downtimeHours: toNumberOrNull(form.downtime) ?? 0,
         correctiveAction: form.correctiveAction.trim(),
         notes: form.notes.trim()
       });

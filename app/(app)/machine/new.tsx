@@ -3,7 +3,7 @@ import { Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button, Card, Field, Muted, Notice, Screen, Subtitle, Title } from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
-import { isValidDateInput, toIsoOrNull } from '../../../lib/format';
+import { isValidDateInput, isValidNumberInput, toIsoOrNull, toNumberOrNull } from '../../../lib/format';
 
 export default function NewMachineScreen() {
   const router = useRouter();
@@ -43,6 +43,14 @@ export default function NewMachineScreen() {
       setError('Installation date must look like 2024-01-15.');
       return;
     }
+    if (!isValidNumberInput(form.operatingHours)) {
+      setError('Operating hours must be a number.');
+      return;
+    }
+    if (!isValidNumberInput(form.ratedPowerKw)) {
+      setError('Rated power (kW) must be a number.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -56,8 +64,8 @@ export default function NewMachineScreen() {
         location: form.location.trim(),
         criticality,
         installationDate: toIsoOrNull(form.installationDate),
-        operatingHours: form.operatingHours ? Number(form.operatingHours) : 0,
-        ratedPowerKw: form.ratedPowerKw ? Number(form.ratedPowerKw) : null,
+        operatingHours: toNumberOrNull(form.operatingHours) ?? 0,
+        ratedPowerKw: toNumberOrNull(form.ratedPowerKw),
         notes: form.notes.trim()
       });
       router.replace(`/(app)/machine/${result.machine._id}`);

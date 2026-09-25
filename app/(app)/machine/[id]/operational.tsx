@@ -3,7 +3,7 @@ import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Badge, Button, Card, EmptyState, Field, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { OperationalRecord } from '../../../../lib/types';
-import { fmtDate, isValidDateInput, toIsoOrNull } from '../../../../lib/format';
+import { fmtDate, isValidDateInput, isValidNumberInput, toIsoOrNull, toNumberOrNull } from '../../../../lib/format';
 
 export default function OperationalDataScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,6 +35,22 @@ export default function OperationalDataScreen() {
       setError('Date must look like 2025-03-10.');
       return;
     }
+    if (!isValidNumberInput(form.operatingHours)) {
+      setError('Operating hours must be a number.');
+      return;
+    }
+    if (!isValidNumberInput(form.productionOutput)) {
+      setError('Production output must be a number.');
+      return;
+    }
+    if (!isValidNumberInput(form.downtime)) {
+      setError('Downtime must be a number.');
+      return;
+    }
+    if (!isValidNumberInput(form.energy)) {
+      setError('Energy must be a number.');
+      return;
+    }
     setBusy(true);
     setError('');
     setFeedback('');
@@ -42,10 +58,10 @@ export default function OperationalDataScreen() {
       await api.post('/api/operational-data', {
         machine: id,
         date: toIsoOrNull(form.date) || new Date().toISOString(),
-        operatingHours: form.operatingHours ? Number(form.operatingHours) : 0,
-        productionOutput: form.productionOutput ? Number(form.productionOutput) : null,
-        downtimeHours: form.downtime ? Number(form.downtime) : 0,
-        energyKwh: form.energy ? Number(form.energy) : null,
+        operatingHours: toNumberOrNull(form.operatingHours) ?? 0,
+        productionOutput: toNumberOrNull(form.productionOutput),
+        downtimeHours: toNumberOrNull(form.downtime) ?? 0,
+        energyKwh: toNumberOrNull(form.energy),
         notes: form.notes.trim()
       });
       setForm({ date: '', operatingHours: '', productionOutput: '', downtime: '', energy: '', notes: '' });

@@ -61,6 +61,26 @@ export function isValidDateInput(value: string): boolean {
   return toIsoOrNull(value) !== null;
 }
 
+/**
+ * Converts user-entered numeric text into a number.
+ * Blank text means "not provided" and becomes null. Text that is not a finite
+ * number also becomes null, so callers must check isValidNumberInput first -
+ * otherwise Number('abc') serialises to null and is rejected by the API.
+ */
+export function toNumberOrNull(value: string): number | null {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** True when the text is blank (not provided) or a finite number. */
+export function isValidNumberInput(value: string): boolean {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return true;
+  return Number.isFinite(Number(trimmed));
+}
+
 export function splitCsv(value: string): string[] {
   return (value || '')
     .split(',')

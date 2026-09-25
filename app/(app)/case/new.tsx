@@ -38,6 +38,10 @@ export default function NewCaseScreen() {
       setError('Select the machine that has the current problem.');
       return;
     }
+    if (problem.trim().length < 3) {
+      setError('Describe the current problem in at least 3 characters.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {

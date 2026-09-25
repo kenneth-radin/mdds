@@ -65,8 +65,42 @@ export const api = {
   del: <T>(path: string) => apiRequest<T>(path, { method: 'DELETE' })
 };
 
+/**
+ * The API throws ApiError(status, message, payload), so ApiError.details is the
+ * whole JSON body and the Zod issues live one level down in payload.details.
+ * This accepts that shape as well as a bare issue array, so a rejected field is
+ * named to the user instead of showing a bare "Validation failed."
+ */
+function describeIssues(details: unknown): string {
+  const issues = Array.isArray(details)
+    ? details
+    : details && typeof details === 'object' && Array.isArray((details as { details?: unknown }).details)
+      ? (details as { details: unknown[] }).details
+      : null;
+  if (!issues) return '';
+  const parts: string[] = [];
+  for (const issue of issues) {
+    if (!issue || typeof issue !== 'object') continue;
+    const { path, message } = issue as { path?: unknown; message?: unknown };
+    if (typeof message !== 'string' || !message) continue;
+    const field = Array.isArray(path) && path.length ? String(path.join('.')) : '';
+    parts.push(field ? `${field}: ${message}` : message);
+  }
+  return parts.join('; ');
+}
+
 export function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
-  if (error instanceof Error) return error.message;
+  if (error instanceof ApiError) {
+    const issues = describeIssues(error.details);
+    return issues ? `${error.message} ${issues}` : error.message;
+  }
+  if (error instanceof Error) {
+    // React Native fetch rejects with this generic text when the device cannot
+    // reach the API host at all, which reads as "nothing happened" to a user.
+    if (error.message === 'Network request failed') {
+      return 'Cannot reach the server. Check your internet connection and try again.';
+    }
+    return error.message;
+  }
   return 'Unexpected error. Please try again.';
 }

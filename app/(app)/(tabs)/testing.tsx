@@ -42,6 +42,18 @@ export default function TestingScreen() {
       setError('Select the machine this test case belongs to.');
       return;
     }
+    if (!description.trim()) {
+      setError('Test case description is required.');
+      return;
+    }
+    if (!expected.trim()) {
+      setError('Expected maintenance solution is required.');
+      return;
+    }
+    if (!actual.trim()) {
+      setError('Actual maintenance solution is required.');
+      return;
+    }
     setBusy(true);
     setError('');
     setFeedback('');
