@@ -29,6 +29,23 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     res.status(409).json({ error: 'A record with that unique value already exists.' });
     return;
   }
+  // Middleware-thrown 4xx errors: validate.ts sets `.status` (e.g. 422) and
+  // body-parser JSON syntax errors carry `.status = 400`. Honor them instead
+  // of misreporting client errors as 500.
+  if (err && typeof err === 'object') {
+    const candidate = err as { status?: unknown; statusCode?: unknown; details?: unknown };
+    const status =
+      typeof candidate.status === 'number'
+        ? candidate.status
+        : typeof candidate.statusCode === 'number'
+          ? candidate.statusCode
+          : null;
+    if (status !== null && status >= 400 && status < 500) {
+      const message = err instanceof Error && err.message ? err.message : 'Request failed.';
+      res.status(status).json({ error: message, details: candidate.details });
+      return;
+    }
+  }
   const message = err instanceof Error ? err.message : 'Unexpected server error.';
   console.error('[error]', message);
   res.status(500).json({ error: message });
