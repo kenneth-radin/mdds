@@ -1,10 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Button, Card, Field, Loading, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { MaintenanceCase } from '../../../../lib/types';
-import { isValidNumberInput, splitCsv, toNumberOrNull } from '../../../../lib/format';
+import { isValidNumberInput, splitCsv, toNumberOrNull, humanize } from '../../../../lib/format';
 
 const results = ['resolved', 'partially-resolved', 'not-resolved'] as const;
 
@@ -89,11 +89,29 @@ export default function CaseOutcomeScreen() {
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <Card>
         <Muted>Outcome</Muted>
-        {results.map((value) => (
-          <Pressable key={value} onPress={() => setResult(value)}>
-            <Title>{result === value ? '◉' : '○'} {value}</Title>
-          </Pressable>
-        ))}
+        <View style={{ marginVertical: 6, gap: 8 }}>
+          {results.map((value) => (
+            <Pressable
+              key={value}
+              onPress={() => setResult(value)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 6,
+                paddingHorizontal: 8,
+                borderRadius: 8,
+                backgroundColor: result === value ? '#f1f5f9' : 'transparent'
+              }}
+            >
+              <Text style={{ fontSize: 16, marginRight: 8, color: result === value ? '#4f46e5' : '#64748b' }}>
+                {result === value ? '◉' : '○'}
+              </Text>
+              <Text style={{ fontSize: 14, fontWeight: result === value ? '700' : '500', color: '#1e293b' }}>
+                {humanize(value)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
         <Field label="Actual maintenance action taken *" value={form.actionTaken} onChangeText={set('actionTaken')} placeholder="What was actually done" />
         <Field label="Parts replaced (comma separated)" value={form.parts} onChangeText={set('parts')} />
         <Field label="Downtime (hours)" value={form.downtime} onChangeText={set('downtime')} keyboardType="numeric" />

@@ -413,8 +413,8 @@ export default function ModelsScreen() {
 
   return (
     <Screen>
-      <Title>ML models</Title>
-      <Subtitle>Layer 3 classifiers. Weights are trained offline and loaded from disk when the API starts.</Subtitle>
+      <Title>AI failure prediction & models</Title>
+      <Subtitle>Predict failure modes from operating parameters using machine learning models trained on benchmark data.</Subtitle>
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {loading && !data ? <Loading label="Loading model cards…" /> : null}
@@ -422,9 +422,7 @@ export default function ModelsScreen() {
       {data ? (
         <>
           <Notice tone="warning">
-            These models are trained on the AI4I 2020 dataset — synthetic benchmark data that was not measured at this
-            facility and is never written into the plant database. They are decision support only; maintenance personnel
-            make the final call (§24).
+            These models are trained on the AI4I 2020 predictive maintenance benchmark (kept separate from your plant records). They provide decision support — maintenance personnel make the final call.
           </Notice>
 
           <Card>

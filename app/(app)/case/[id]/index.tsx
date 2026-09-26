@@ -1,9 +1,10 @@
 import React, { useCallback, useState } from 'react';
+import { Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Badge, Button, Card, EmptyState, Field, KeyValue, Loading, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
+import { Badge, Button, Card, Divider, EmptyState, Field, KeyValue, Loading, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { MaintenanceCase } from '../../../../lib/types';
-import { fmtDateTime, fmtNumber, EMPTY } from '../../../../lib/format';
+import { fmtDateTime, fmtNumber, humanize, EMPTY } from '../../../../lib/format';
 
 export default function CaseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -75,8 +76,8 @@ export default function CaseDetailScreen() {
       <Title>{item.caseNumber}</Title>
       <Subtitle>{machine ? `${machine.machineId} · ${machine.name}` : 'Machine'}</Subtitle>
       <Card>
-        <KeyValue label="Status" value={item.status} />
-        <KeyValue label="Urgency" value={item.urgency} />
+        <KeyValue label="Status" value={humanize(item.status)} />
+        <KeyValue label="Urgency" value={humanize(item.urgency)} />
         <KeyValue label="Reported" value={fmtDateTime(item.dateReported)} />
         <KeyValue label="Current problem" value={item.currentProblem} />
         <KeyValue label="Symptoms" value={item.symptoms.length ? item.symptoms.join(', ') : '—'} />
@@ -85,48 +86,95 @@ export default function CaseDetailScreen() {
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
       <Card>
-        <Title>Analysis</Title>
+        <Title>Analysis & suggestions</Title>
         <Muted>Generated: {fmtDateTime(analysis.generatedAt)}</Muted>
-        <Muted>Data used: {analysis.dataUsed.length ? analysis.dataUsed.join(' · ') : '—'}</Muted>
-        {analysis.sufficientData ? <Notice tone="success">{analysis.message}</Notice> : <Notice tone="warning">{EMPTY.suggestions}</Notice>}
+        <Muted>Inputs: {analysis.dataUsed.length ? analysis.dataUsed.join(' · ') : '—'}</Muted>
+        {analysis.sufficientData ? (
+          <Notice tone="success">{analysis.message}</Notice>
+        ) : (
+          <Notice tone="warning">{EMPTY.suggestions}</Notice>
+        )}
         {analysis.missingData.map((line) => (
           <Muted key={line}>• {line}</Muted>
         ))}
+
         {analysis.suggestions.length === 0 ? (
           <EmptyState
-            title="Insufficient historical data for reliable analysis."
-            message="Record more historical maintenance, failure and completed case data, then run the analysis again."
+            title="Not enough similar past records to suggest a solution yet."
+            message="Add more maintenance, failure, or completed-case records for this machine, then re-run analysis."
           />
         ) : (
           analysis.suggestions.map((suggestion) => (
             <Card key={suggestion.title}>
               <Title>{suggestion.title}</Title>
               <Muted>{suggestion.rationale}</Muted>
-              <KeyValue label="Supporting records" value={String(suggestion.supportCount)} />
-              <KeyValue label="Expected downtime" value={suggestion.expectedDowntimeHours === null ? '—' : `${suggestion.expectedDowntimeHours} h`} />
-              <KeyValue label="Parts" value={suggestion.parts.length ? suggestion.parts.join(', ') : '—'} />
-              <KeyValue label="Confidence (data-derived)" value={`${suggestion.confidence}%`} />
-              <Muted>Evidence IDs: {suggestion.sourceRecordIds.join(', ')}</Muted>
-              <Badge text="historical evidence" />
+              <KeyValue label="Supporting past records" value={String(suggestion.supportCount)} />
+              <KeyValue
+                label="Average past downtime"
+                value={suggestion.expectedDowntimeHours === null ? '—' : `${suggestion.expectedDowntimeHours} hr`}
+              />
+              <KeyValue label="Parts used in past" value={suggestion.parts.length ? suggestion.parts.join(', ') : '—'} />
+              <KeyValue label="Evidence strength" value={`${suggestion.confidence}%`} />
+
+              {suggestion.evidence && suggestion.evidence.length > 0 ? (
+                <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#e2e8f0' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 4 }}>Supporting past records:</Text>
+                  {suggestion.evidence.map((ev, idx) => (
+                    <Text key={idx} style={{ fontSize: 11, color: '#64748b', lineHeight: 16 }}>
+                      • {ev}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
             </Card>
           ))
         )}
         <Button title={busy ? 'Working…' : 'Re-run analysis'} variant="secondary" onPress={analyzeAgain} disabled={busy} />
       </Card>
 
+      {/* Explainer: How this analysis works */}
+      <Card>
+        <Title>How this analysis works</Title>
+        <Subtitle>Evidence-based decision support from your machine's real recorded history.</Subtitle>
+        <Text style={{ fontSize: 12, color: '#475569', lineHeight: 18 }}>
+          1. We compare the current problem and symptoms with all previous maintenance jobs, failure reports, and resolved cases for this machine.
+        </Text>
+        <Text style={{ fontSize: 12, color: '#475569', lineHeight: 18, marginTop: 4 }}>
+          2. Records with matching wording are ranked using TF-IDF text similarity — identical phrases rank higher than common words.
+        </Text>
+        <Text style={{ fontSize: 12, color: '#475569', lineHeight: 18, marginTop: 4 }}>
+          3. Actions taken in the closest past cases become suggestions, ranked by how often they were used and how closely they match.
+        </Text>
+        <Text style={{ fontSize: 12, color: '#475569', lineHeight: 18, marginTop: 4 }}>
+          4. "Evidence strength" reflects the number and similarity of matching records. It is a guide based on past data, not a guarantee.
+        </Text>
+        <Text style={{ fontSize: 12, color: '#475569', lineHeight: 18, marginTop: 4 }}>
+          5. If fewer than 3 similar records exist, the system states that data is insufficient rather than guessing.
+        </Text>
+      </Card>
+
       {analysis.statistics ? (
         <Card>
-          <Title>Historical statistics</Title>
-          <KeyValue label="Maintenance records" value={String(analysis.statistics.totalMaintenanceRecords)} />
-          <KeyValue label="Failure records" value={String(analysis.statistics.totalFailureRecords)} />
-          <KeyValue label="MTBF (days)" value={fmtNumber(analysis.statistics.mtbfDays)} />
-          <KeyValue label="MTTR (hours)" value={fmtNumber(analysis.statistics.mttrHours)} />
-          <KeyValue label="Avg maintenance interval (days)" value={fmtNumber(analysis.statistics.averageMaintenanceIntervalDays)} />
-          <KeyValue label="Avg downtime (hours)" value={fmtNumber(analysis.statistics.averageDowntimeHours)} />
-          <KeyValue label="Avg cost" value={fmtNumber(analysis.statistics.averageCost)} />
-          <KeyValue label="Failure modes" value={analysis.statistics.failureModes.length ? analysis.statistics.failureModes.map((f) => `${f.mode} (${f.count})`).join(', ') : '—'} />
-          <KeyValue label="Common parts" value={analysis.statistics.commonParts.length ? analysis.statistics.commonParts.map((p) => `${p.part} (${p.count})`).join(', ') : '—'} />
-          <KeyValue label="Common actions" value={analysis.statistics.commonActions.length ? analysis.statistics.commonActions.map((a) => `${a.action} (${a.count})`).join(', ') : '—'} />
+          <Title>Machine history statistics</Title>
+          <KeyValue label="Past maintenance jobs" value={String(analysis.statistics.totalMaintenanceRecords)} />
+          <KeyValue label="Past failure reports" value={String(analysis.statistics.totalFailureRecords)} />
+          <KeyValue label="Avg days between failures" value={fmtNumber(analysis.statistics.mtbfDays)} />
+          <KeyValue label="Avg repair time" value={analysis.statistics.mttrHours === null ? '—' : `${fmtNumber(analysis.statistics.mttrHours)} hr`} />
+          <KeyValue label="Avg maintenance interval" value={analysis.statistics.averageMaintenanceIntervalDays === null ? '—' : `${fmtNumber(analysis.statistics.averageMaintenanceIntervalDays)} days`} />
+          <KeyValue label="Avg recorded downtime" value={analysis.statistics.averageDowntimeHours === null ? '—' : `${fmtNumber(analysis.statistics.averageDowntimeHours)} hr`} />
+          <KeyValue label="Avg recorded cost" value={fmtNumber(analysis.statistics.averageCost)} />
+          <KeyValue
+            label="Past failure modes"
+            value={analysis.statistics.failureModes.length ? analysis.statistics.failureModes.map((f) => `${f.mode} (${f.count})`).join(', ') : '—'}
+          />
+          <KeyValue
+            label="Common parts replaced"
+            value={analysis.statistics.commonParts.length ? analysis.statistics.commonParts.map((p) => `${p.part} (${p.count})`).join(', ') : '—'}
+          />
+          <KeyValue
+            label="Common actions taken"
+            value={analysis.statistics.commonActions.length ? analysis.statistics.commonActions.map((a) => `${a.action} (${a.count})`).join(', ') : '—'}
+          />
         </Card>
       ) : null}
 
@@ -134,7 +182,7 @@ export default function CaseDetailScreen() {
         <Title>Maintenance personnel review</Title>
         {item.review.decision ? (
           <>
-            <KeyValue label="Decision" value={item.review.decision} />
+            <KeyValue label="Decision" value={humanize(item.review.decision)} />
             <KeyValue label="Modified suggestion" value={item.review.modifiedSuggestion || '—'} />
             <KeyValue label="Reviewer note" value={item.review.reviewerNote || '—'} />
             <KeyValue label="Reviewed" value={fmtDateTime(item.review.reviewedAt)} />
@@ -153,10 +201,10 @@ export default function CaseDetailScreen() {
       {item.status === 'completed' ? (
         <Card>
           <Title>Recorded outcome</Title>
-          <KeyValue label="Result" value={item.outcome.result || '—'} />
+          <KeyValue label="Result" value={humanize(item.outcome.result)} />
           <KeyValue label="Action taken" value={item.actualAction.actionTaken || '—'} />
           <KeyValue label="Parts replaced" value={item.actualAction.partsReplaced.length ? item.actualAction.partsReplaced.join(', ') : '—'} />
-          <KeyValue label="Downtime (h)" value={fmtNumber(item.actualAction.downtimeHours)} />
+          <KeyValue label="Downtime" value={item.actualAction.downtimeHours === null ? '—' : `${fmtNumber(item.actualAction.downtimeHours)} hr`} />
           <KeyValue label="Recorded" value={fmtDateTime(item.outcome.recordedAt)} />
         </Card>
       ) : (

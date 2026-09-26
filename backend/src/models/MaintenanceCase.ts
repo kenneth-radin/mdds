@@ -12,6 +12,7 @@ export interface IAnalysisSuggestion {
   expectedDowntimeHours: number | null;
   supportCount: number;
   sourceRecordIds: string[];
+  evidence?: string[];
   confidence: number;
 }
 

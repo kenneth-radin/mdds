@@ -85,6 +85,7 @@ export interface AnalysisSuggestion {
   expectedDowntimeHours: number | null;
   supportCount: number;
   sourceRecordIds: string[];
+  evidence?: string[];
   confidence: number;
 }
 

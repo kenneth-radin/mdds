@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Badge, Button, Card, EmptyState, Muted, Notice, Screen, Subtitle, Title } from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
 import { MaintenanceCase } from '../../../lib/types';
-import { fmtDateTime } from '../../../lib/format';
+import { fmtDateTime, humanize } from '../../../lib/format';
 
 function tone(status: MaintenanceCase['status']): 'info' | 'warning' | 'danger' | 'success' {
   if (status === 'completed') return 'success';
@@ -44,7 +44,7 @@ export default function CasesScreen() {
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {loading && cases.length === 0 ? <Muted>Loading…</Muted> : null}
       {!loading && cases.length === 0 ? (
-        <EmptyState title="No historical maintenance cases available." message="Create a case to run an analysis against recorded history." />
+        <EmptyState title="No maintenance cases recorded yet." message="Create a case to run an analysis against this machine's history." />
       ) : null}
       {cases.map((item) => {
         const machine = typeof item.machine === 'string' ? null : item.machine;
@@ -55,7 +55,7 @@ export default function CasesScreen() {
               <Muted>{machine ? `${machine.machineId} · ${machine.name}` : 'Machine'}</Muted>
               <Muted>{item.currentProblem}</Muted>
               <Muted>Reported: {fmtDateTime(item.dateReported)}</Muted>
-              <Badge text={item.status} tone={tone(item.status)} />
+              <Badge text={humanize(item.status)} tone={tone(item.status)} />
             </Card>
           </Pressable>
         );

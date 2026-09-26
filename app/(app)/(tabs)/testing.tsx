@@ -81,7 +81,7 @@ export default function TestingScreen() {
   return (
     <Screen>
       <Title>Testing</Title>
-      <Subtitle>Compare the expected maintenance solution with the actual solution. Match score is computed from the real compared text.</Subtitle>
+      <Subtitle>Compare what the system suggests with the actual maintenance solution performed.</Subtitle>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {feedback ? <Notice tone="success">{feedback}</Notice> : null}
 
@@ -118,7 +118,7 @@ export default function TestingScreen() {
               <Muted>Expected: {item.expectedSuggestion}</Muted>
               <Muted>Actual: {item.actualSuggestion}</Muted>
               <Muted>Recorded: {fmtDateTime(item.createdAt)}</Muted>
-              <Badge text={item.matched ? `matched ${item.matchScore ?? ''}%` : `not matched ${item.matchScore ?? ''}%`} tone={item.matched ? 'success' : 'warning'} />
+              <Badge text={item.matched ? `Match: ${item.matchScore ?? 0}%` : `No match (${item.matchScore ?? 0}%)`} tone={item.matched ? 'success' : 'warning'} />
             </Card>
           );
         })

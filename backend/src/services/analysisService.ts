@@ -28,15 +28,34 @@ export interface AnalysisResult {
 
 function buildMissingData(history: MachineHistory, comparable: ComparableCase[]): string[] {
   const missing: string[] = [];
-  if (history.maintenanceRecords.length === 0) missing.push('No maintenance history available for this machine.');
-  if (history.failureRecords.length === 0) missing.push('No failure records available for this machine.');
-  if (history.completedCases.length === 0) missing.push('No completed maintenance cases available for this machine.');
+  if (history.maintenanceRecords.length === 0) missing.push('No past maintenance records found for this machine.');
+  if (history.failureRecords.length === 0) missing.push('No past failure records found for this machine.');
+  if (history.completedCases.length === 0) missing.push('No resolved maintenance cases found for this machine.');
   if (comparable.length < MIN_COMPARABLE_RECORDS) {
     missing.push(
-      `Only ${comparable.length} comparable historical record(s) found; at least ${MIN_COMPARABLE_RECORDS} are required.`
+      `Found ${comparable.length} similar past record(s); at least ${MIN_COMPARABLE_RECORDS} are needed for a recommendation.`
     );
   }
   return missing;
+}
+
+function formatEvidenceLine(record: ComparableCase): string {
+  const typeLabel =
+    record.sourceType === 'maintenance-record'
+      ? 'past maintenance'
+      : record.sourceType === 'failure-record'
+      ? 'past failure'
+      : 'resolved case';
+  const dateStr = record.date
+    ? new Date(record.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    : '';
+  const actionOrProblem = (record.action || record.problem || 'Maintenance recorded').trim();
+  const shortSummary = actionOrProblem.length > 60 ? actionOrProblem.slice(0, 57) + '...' : actionOrProblem;
+  const matchPct = Math.round(record.similarity * 100);
+  const meta = [typeLabel];
+  if (dateStr) meta.push(dateStr);
+  if (matchPct > 0) meta.push(String(matchPct) + '% text match');
+  return '"' + shortSummary + '" (' + meta.join(' · ') + ')';
 }
 
 function groupComparable(records: ComparableCase[]): IAnalysisSuggestion[] {
@@ -67,11 +86,12 @@ function groupComparable(records: ComparableCase[]): IAnalysisSuggestion[] {
     const confidence = Math.max(1, Math.min(95, Math.round(supportRatio * avgSimilarity * 100 * (0.5 + volumeFactor))));
 
     const failureModes = [...new Set(group.map((g) => g.failureMode).filter(Boolean))];
+    const matchPct = Math.round(avgSimilarity * 100);
     const rationaleParts = [
-      `${supportCount} comparable historical record(s) used this action (average similarity ${avgSimilarity}).`
+      `Used in ${supportCount} of ${records.length} similar past records (${matchPct}% average text match).`
     ];
-    if (failureModes.length > 0) rationaleParts.push(`Related recorded failure mode(s): ${failureModes.join(', ')}.`);
-    if (expectedDowntimeHours !== null) rationaleParts.push(`Average recorded downtime: ${expectedDowntimeHours} hour(s).`);
+    if (failureModes.length > 0) rationaleParts.push(`Linked to past failure mode(s): ${failureModes.join(', ')}.`);
+    if (expectedDowntimeHours !== null) rationaleParts.push(`Average recorded downtime: ${expectedDowntimeHours} hr(s).`);
 
     suggestions.push({
       title: sample.action.length > 120 ? `${sample.action.slice(0, 117)}...` : sample.action,
@@ -81,6 +101,10 @@ function groupComparable(records: ComparableCase[]): IAnalysisSuggestion[] {
       expectedDowntimeHours,
       supportCount,
       sourceRecordIds: group.map((g) => g.sourceId),
+      evidence: [...group]
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, 4)
+        .map(formatEvidenceLine),
       confidence
     });
   });
@@ -101,20 +125,20 @@ export function analyzeMaintenanceCase(
   const sufficientData = comparable.length >= MIN_COMPARABLE_RECORDS;
 
   const dataUsed = [
-    `${history.maintenanceRecords.length} maintenance record(s)`,
-    `${history.failureRecords.length} failure record(s)`,
-    `${history.operationalRecords.length} operational data record(s)`,
-    `${history.completedCases.length} completed case(s)`,
-    `${comparable.length} comparable record(s)`,
+    `${history.maintenanceRecords.length} past maintenance record(s)`,
+    `${history.failureRecords.length} past failure record(s)`,
+    `${history.operationalRecords.length} operational log(s)`,
+    `${history.completedCases.length} resolved case(s)`,
+    `${comparable.length} similar record(s) matched`,
     `similarity method: ${SIMILARITY_METHOD}`,
-    `machine profile: ${machine.machineId} / ${machine.machineType}`
+    `machine profile: ${machine.machineId} (${machine.machineType})`
   ];
 
   if (!sufficientData) {
     return {
       generatedAt: new Date(),
       sufficientData: false,
-      message: 'Insufficient historical data for reliable analysis.',
+      message: 'Not enough similar past records to suggest a solution yet.',
       missingData,
       dataUsed,
       statistics,
@@ -129,8 +153,8 @@ export function analyzeMaintenanceCase(
     sufficientData: suggestions.length > 0,
     message:
       suggestions.length > 0
-        ? `${suggestions.length} suggestion(s) derived from ${comparable.length} comparable historical record(s).`
-        : 'Insufficient historical data for reliable analysis.',
+        ? `Found ${suggestions.length} suggestion(s) based on ${comparable.length} similar past record(s).`
+        : 'Not enough similar past records to suggest a solution yet.',
     missingData: suggestions.length > 0 ? [] : missingData,
     dataUsed,
     statistics,

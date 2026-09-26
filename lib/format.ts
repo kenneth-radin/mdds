@@ -93,7 +93,19 @@ export const EMPTY = {
   maintenance: 'No maintenance history available.',
   failures: 'No failure records available.',
   operational: 'No operational data recorded yet.',
-  cases: 'No historical maintenance cases available.',
+  cases: 'No maintenance cases recorded yet.',
   testing: 'No testing cases recorded yet.',
-  suggestions: 'Insufficient historical data for reliable analysis.'
+  suggestions: 'Not enough similar past records to suggest a solution yet.'
 };
+
+
+/**
+ * Converts enum-like values such as "partially-resolved" or "analyzed"
+ * into clean, readable text such as "Partially resolved" or "Analyzed".
+ */
+export function humanize(value?: string | null): string {
+  if (!value) return '—';
+  const clean = value.replace(/[-_]+/g, ' ').trim();
+  if (!clean) return '—';
+  return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase();
+}
