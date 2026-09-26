@@ -59,6 +59,15 @@ export default function DashboardScreen() {
           <Button title="+ New maintenance case" onPress={() => router.push('/(app)/case/new')} />
         </>
       ) : null}
+
+      <Card>
+        <KeyValue label="ML models" value="Layer 3 benchmark classifiers" />
+        <Muted>
+          Trained offline on the AI4I 2020 synthetic benchmark dataset — never mixed with this facility&apos;s records.
+          Open a card to read its metrics, confusion matrix and stated limitations, or score entered parameters.
+        </Muted>
+        <Button title="Open ML models" variant="secondary" onPress={() => router.push('/(app)/(tabs)/models')} />
+      </Card>
     </Screen>
   );
 }

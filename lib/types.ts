@@ -24,8 +24,15 @@ export interface Machine {
   ratedVoltage: number | null;
   ratedCurrent: number | null;
   designSpeedRpm: number | null;
+  /** §11 — rated / design capacity, interpreted with capacityUnit. */
+  ratedCapacity: number | null;
+  capacityUnit: string;
+  /** §11 — year acquired / put into service. */
+  yearAcquired: number | null;
   operatingHours: number;
   lastMaintenanceDate: string | null;
+  /** §11 — recommended maintenance interval in days. */
+  recommendedMaintenanceIntervalDays: number | null;
   notes: string;
 }
 
@@ -172,4 +179,109 @@ export interface SummaryReport {
   failuresBySeverity: Array<{ severity: string; count: number }>;
   casesByStatus: Array<{ status: string; count: number }>;
   testing: { total: number; matched: number; matchRate: number | null };
+  /** §46 — how personnel responded to the analysis suggestions. Buckets sum to total cases. */
+  suggestionDecisions: { accepted: number; modified: number; rejected: number; notReviewed: number };
+}
+
+/** §23 — per-class precision/recall/F1, so a rare positive class cannot hide behind accuracy. */
+export interface MlPerClassMetrics {
+  label: string;
+  support: number;
+  truePositives: number;
+  falsePositives: number;
+  falseNegatives: number;
+  precision: number;
+  recall: number;
+  f1: number;
+}
+
+/**
+ * A model card. This is the part that makes the AI defensible: for every exposed
+ * model it states the dataset and licence, whether the data is synthetic, how
+ * evaluation was done, the full per-class metrics, the majority-class baseline it
+ * had to beat, and an explicit list of limitations.
+ */
+export interface MlModelCard {
+  id: string;
+  name: string;
+  description: string;
+  kind: string;
+  layer: number;
+  status: 'trained' | 'not-trained';
+  /** Why the model is unavailable; only present when status is 'not-trained'. */
+  reason?: string;
+  task: string;
+  dataset: {
+    name: string;
+    source: string;
+    citation: string;
+    license: string;
+    synthetic: boolean;
+    samples: number;
+    classBalance: Record<string, number>;
+    note: string;
+  } | null;
+  features: string[];
+  labels: string[];
+  training: { samples: number; features: number; classes: number; epochs: number; learningRate: number; l2: number; stoppedAtEpoch: number } | null;
+  evaluation: {
+    method: string;
+    folds: number;
+    seed: number;
+    accuracy: number;
+    macroF1: number;
+    weightedF1: number;
+    majorityClassBaseline: number;
+    majorityClassLabel: string;
+    samples: number;
+    labels: string[];
+    perClass: MlPerClassMetrics[];
+    confusionMatrix: number[][];
+  } | null;
+  limitations: string[];
+  trainedAt: string | null;
+}
+
+export interface MlModelList {
+  models: MlModelCard[];
+  count: number;
+  decisionThreshold: number;
+}
+
+/** Operating parameters accepted by the benchmark classifiers. */
+export interface MlOperatingParameters {
+  airTemperatureK: number;
+  processTemperatureK: number;
+  rotationalSpeedRpm: number;
+  torqueNm: number;
+  toolWearMin: number;
+  productType: 'L' | 'M' | 'H';
+}
+
+export interface MlPrediction {
+  modelId: string;
+  name: string;
+  status: 'trained' | 'not-trained';
+  reason?: string;
+  flagged?: boolean;
+  probability?: number;
+  decisionThreshold?: number;
+  evaluation: {
+    method: string;
+    accuracy: number;
+    majorityClassBaseline: number;
+    macroF1: number;
+    perClass: MlPerClassMetrics[];
+  } | null;
+}
+
+export interface MlPredictResponse {
+  analysisMethod: string;
+  layer: number;
+  input: MlOperatingParameters;
+  /** The exact derived feature vector, so the caller can audit the computation. */
+  features: Array<{ name: string; value: number }>;
+  results: MlPrediction[];
+  limitations: string[];
+  note: string;
 }

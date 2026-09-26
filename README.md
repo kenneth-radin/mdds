@@ -18,6 +18,7 @@ Machine profile -> Historical records -> Current problem -> Data-derived analysi
 | REST API | Node.js, Express, TypeScript | `backend/src` |
 | Database | MongoDB Atlas, Mongoose | `backend/src/models` |
 | Auth | JWT + bcrypt + expo-secure-store | `backend/src/routes/auth.routes.ts`, `lib/auth.tsx` |
+| Analysis / ML | Pure TypeScript: TF-IDF retrieval, statistics, logistic regression | `backend/src/services/`, `backend/src/services/ml/` |
 
 The original Vite web prototype remains in `src/` and `index.html`. The mobile app is the capstone deliverable.
 
@@ -27,11 +28,70 @@ The original Vite web prototype remains in `src/` and `index.html`. The mobile a
 - No seeded machines, maintenance records, failures, recommendations, statistics or ML results.
 - The analysis engine only uses records that exist in MongoDB. When evidence is below the threshold it returns:
   `Insufficient historical data for reliable analysis.`
+- The ML benchmark models are trained offline from the public AI4I 2020 dataset and are **never** written into the
+  plant database. Their predictions are labelled as benchmark output, not live sensor monitoring, and each response
+  carries the model card's limitations alongside the numbers.
 
 ## Analysis engine rules
 
-Minimum evidence: **3 comparable historical records** (maintenance records, failure records, or completed cases) whose
-problem/symptom text overlaps the current problem. Comparable records are found with deterministic token overlap.
+The analysis engine is a three-layer stack. Every layer is deterministic and every number it reports traces back
+to a real record or a documented measurement.
+
+### Layer 1 — retrieval (TF-IDF cosine similarity)
+
+Minimum evidence: **3 comparable historical records** (maintenance records, failure records, or completed cases)
+whose problem/symptom text matches the current problem.
+
+Comparable records are ranked with **TF-IDF weighted cosine similarity** (`backend/src/services/ml/tfidf.ts`),
+built over the machine's own record set. Plain token overlap (Jaccard) was replaced because a maintenance corpus
+is full of low-information verbs — *replaced*, *checked*, *inspected* — that appear in almost every record, so
+overlap scores two unrelated jobs as similar merely because both used the word "replaced". TF-IDF down-weights
+terms common across the corpus and up-weights discriminative ones (*spindle*, *chatter*, *coolant*), which is
+what actually separates one failure mode from another.
+
+The method name is returned to the client in `dataUsed` as
+`similarity method: TF-IDF weighted cosine similarity (Layer 1)`, so a reader never has to guess how the
+evidence was retrieved. Retrieval is pure TypeScript with zero dependencies and no randomness: the same history
+and the same problem always produce the same ranking.
+
+### Layer 2 — statistics
+
+Statistics (MTBF, MTTR, average maintenance interval, average downtime, average cost, failure modes, common
+parts, common actions) are aggregated from real records.
+
+### Layer 3 — trained benchmark classifiers
+
+`backend/src/services/ml/` holds a from-scratch logistic-regression implementation
+(`logisticRegression.ts`) trained on the **AI4I 2020 Predictive Maintenance Dataset** in 5-fold stratified
+cross-validation. Nothing is downloaded at runtime and no third-party ML service is called.
+
+| Script | Purpose |
+| --- | --- |
+| `npm run ml:train` | Trains the six benchmark classifiers and writes model cards + weights to `backend/data/models/` |
+| `npm run ml:verify` | Re-checks the persisted cards against the training report |
+| `npm run ml:check` | Live HTTP verification of the ML endpoints (see below) |
+
+Six models are registered — `ai4i-machine-failure` plus one per failure mode (TWF, HDF, PWF, OSF, RNF). Each
+carries a **model card**: the dataset and its licence, `synthetic: true`, exact features, the evaluation method,
+per-class precision/recall/F1, the full confusion matrix, the majority-class baseline it must beat, and an
+explicit list of limitations. A model card with `status: 'not-trained'` is a first-class result, not an error —
+it is how the system says "I do not have enough evidence yet" instead of inventing an answer.
+
+Why accuracy alone is never reported on this dataset:
+
+```text
+ai4i-machine-failure   majority-class baseline 96.61%
+ai4i-twf               majority-class baseline 99.54%
+ai4i-hdf               majority-class baseline 98.85%
+ai4i-pwf               majority-class baseline 99.05%
+ai4i-osf               majority-class baseline 99.02%
+ai4i-rnf               majority-class baseline 99.81%
+```
+
+A model that always answered "no failure" would already score 96.61% accuracy and catch nothing. The
+classifiers are therefore trained with **balanced class weights**: they deliberately score *below* that
+baseline because they trade specificity for recall, so rare failures are surfaced rather than ignored. They are
+a screening tool that flags candidates for inspection, not a confirmatory test.
 
 Each suggestion contains only real evidence:
 
@@ -40,9 +100,6 @@ Each suggestion contains only real evidence:
 - `parts`, `expectedDowntimeHours` - computed from those same records
 - `supportCount`, `sourceRecordIds` - the exact database records used
 - `confidence` - derived from evidence volume and similarity, never random
-
-Statistics (MTBF, MTTR, average maintenance interval, average downtime, average cost, failure modes, common parts,
-common actions) are aggregated from real records.
 
 ## Setup
 
@@ -170,6 +227,7 @@ PUT    /api/maintenance-cases/:id/review
 PUT    /api/maintenance-cases/:id/outcome
 GET    /api/testing/cases              POST /api/testing/cases
 GET    /api/reports/summary
+GET    /api/ml/models             GET  /api/ml/models/:id      POST /api/ml/predict
 ```
 
 All routes except `/api/health`, `/api/auth/register` and `/api/auth/login` require `Authorization: Bearer <token>`.
@@ -203,8 +261,9 @@ npx expo export --platform android         # Expo Router bundle for Expo Go
 npx expo-doctor                            # Expo compatibility checks
 ```
 
-`backend/scripts/e2e-check.cjs` runs a 17-check end-to-end verification (register, empty state, persistence,
-insufficient-data refusal, evidence-based analysis, review, outcome, testing case, report aggregates). It targets a
+`backend/scripts/e2e-check.cjs` runs a 30-check end-to-end verification (register, empty state, persistence,
+insufficient-data refusal, evidence-based analysis, Layer 1 retrieval method and ranking, review, outcome, testing
+case, report aggregates, role and validation guards, record edit/delete, cascade cleanup). It targets a
 throwaway database such as `mdss_e2e` and drops that database when finished, so the real `mdss` database stays empty:
 
 ```powershell
@@ -216,6 +275,47 @@ npm --prefix backend run dev
 $env:MONGODB_URI='mongodb+srv://.../mdss_e2e?retryWrites=true&w=majority'
 node backend/scripts/e2e-check.cjs
 ```
+
+`backend/scripts/ml-check.cjs` runs a 20-check live verification of the ML surface against a **started backend**.
+It asserts that the endpoints require authentication, that all six cards are trained and cite the dataset
+licence, that every card declares `synthetic: true`, a majority-class baseline, a confusion matrix and
+limitations, that unknown model ids return 404 rather than a silent empty result, and — most importantly — that
+the models respond to their inputs instead of returning a constant:
+
+```text
+PASS - model responds to inputs instead of returning a constant :: benign=0.1166 stressed=0.9788
+PASS - high tool-wear/high-torque input raises predicted failure risk :: 0.1166 -> 0.9788
+```
+
+Use a throwaway database for this too, since the script registers a user:
+
+```powershell
+# terminal 1 - API on port 4010 against a scratch database
+$env:PORT='4010'
+$env:MONGODB_URI='mongodb+srv://.../mdss_mlcheck?retryWrites=true&w=majority'
+npm --prefix backend run dev
+
+# terminal 2 - run the ML checks
+npm run ml:check
+```
+
+## Trained model artifacts
+
+`backend/src/app.ts` loads the persisted cards and weights from `backend/data/models/` at start-up via
+`hydrateFromDisk()`. The server **does not train at start-up** — training is a deliberate, separate step
+(`npm run ml:train`) so it never runs in a request path or a cold boot.
+
+This means `backend/data/` must be committed for a deployment to serve trained models. The Docker image copies
+`backend/` wholesale and only runs `tsc`, so if the model JSON files are absent the deployed API reports zero
+models and every prediction returns `status: 'not-trained'`. The directory holds:
+
+```text
+backend/data/ai4i2020.csv          training input, AI4I 2020, CC BY 4.0
+backend/data/models/manifest.json  the model cards
+backend/data/models/ai4i-*.json    the six fitted weight sets
+```
+
+Re-run `npm run ml:train` to regenerate them; the split is seeded (`CV_SEED = 42`) so results are reproducible.
 
 ## Security
 

@@ -1,12 +1,14 @@
 import React from 'react';
 import { Alert } from 'react-native';
-import { Button, Card, KeyValue, Notice, Screen, Subtitle, Title } from '../../../components/ui';
+import { useRouter } from 'expo-router';
+import { Button, Card, KeyValue, Muted, Notice, Screen, Subtitle, Title } from '../../../components/ui';
 import { useAuth } from '../../../lib/auth';
 import { API_URL } from '../../../lib/config';
 import { fmtDateTime } from '../../../lib/format';
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
+  const router = useRouter();
 
   const confirmSignOut = () => {
     Alert.alert('Sign out', 'End the current session on this device?', [
@@ -32,6 +34,14 @@ export default function SettingsScreen() {
         <Notice>
           To reach the backend from a physical phone, EXPO_PUBLIC_API_URL must point to your computer LAN IP (same Wi-Fi) or a backend tunnel. Do not put database or JWT secrets in this app.
         </Notice>
+      </Card>
+      <Card>
+        <KeyValue label="Machine learning" value="Layer 3 benchmark models" />
+        <Muted>
+          Model cards with dataset, licence, per-class metrics, confusion matrices and stated limitations, plus a form
+          that scores entered operating parameters with the trained classifiers.
+        </Muted>
+        <Button title="Open ML models" variant="secondary" onPress={() => router.push('/(app)/(tabs)/models')} />
       </Card>
       <Button title="Sign out" variant="danger" onPress={confirmSignOut} />
     </Screen>

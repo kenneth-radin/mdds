@@ -14,6 +14,9 @@
     "typecheck:all": "npm run typecheck && npm run typecheck:mobile && npm run typecheck:backend",
     "backend": "npm --prefix backend run dev",
     "backend:build": "npm --prefix backend run build",
+    "ml:train": "npm --prefix backend run train:ml",
+    "ml:verify": "npm --prefix backend run verify:ml",
+    "ml:check": "node backend/scripts/ml-check.cjs",
     "expo:start": "expo start",
     "expo:tunnel": "expo start --tunnel"
   },

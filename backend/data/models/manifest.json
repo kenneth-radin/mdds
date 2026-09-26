@@ -1,0 +1,638 @@
+[
+  {
+    "id": "ai4i-machine-failure",
+    "name": "Machine failure (any)",
+    "description": "One-vs-rest logistic regression over AI4I operating parameters, fitted with balanced class weights and evaluated by 5-fold stratified cross-validation.",
+    "kind": "logistic-regression",
+    "layer": 3,
+    "status": "trained",
+    "task": "binary classification",
+    "dataset": {
+      "name": "AI4I 2020 Predictive Maintenance Dataset",
+      "source": "UCI Machine Learning Repository, dataset id 601",
+      "citation": "AI4I 2020 Predictive Maintenance Dataset [Dataset]. (2020). UCI ML Repository. https://doi.org/10.24432/C5HS5C",
+      "license": "CC BY 4.0",
+      "synthetic": true,
+      "samples": 10000,
+      "classBalance": {
+        "positive": 339,
+        "negative": 9661
+      },
+      "note": "Synthetic data that reflects real predictive maintenance scenarios. It is NOT measured at this institution and is never written into the plant database."
+    },
+    "features": [
+      "airTemperatureK",
+      "processTemperatureK",
+      "rotationalSpeedRpm",
+      "torqueNm",
+      "toolWearMin",
+      "productTypeL",
+      "productTypeM",
+      "productTypeH",
+      "temperatureGapK",
+      "mechanicalPowerW",
+      "wearStrainMinNm"
+    ],
+    "labels": [
+      "0",
+      "1"
+    ],
+    "training": {
+      "samples": 10000,
+      "features": 11,
+      "classes": 2,
+      "epochs": 150,
+      "learningRate": 0.5,
+      "l2": 0.01,
+      "stoppedAtEpoch": 150
+    },
+    "evaluation": {
+      "method": "5-fold stratified cross-validation",
+      "folds": 5,
+      "seed": 42,
+      "accuracy": 0.8165,
+      "macroF1": 0.562,
+      "weightedF1": 0.8733,
+      "majorityClassBaseline": 0.9661,
+      "majorityClassLabel": "0",
+      "samples": 10000,
+      "labels": [
+        "0",
+        "1"
+      ],
+      "perClass": [
+        {
+          "label": "0",
+          "support": 9661,
+          "truePositives": 7894,
+          "falsePositives": 68,
+          "falseNegatives": 1767,
+          "precision": 0.9915,
+          "recall": 0.8171,
+          "f1": 0.8959
+        },
+        {
+          "label": "1",
+          "support": 339,
+          "truePositives": 271,
+          "falsePositives": 1767,
+          "falseNegatives": 68,
+          "precision": 0.133,
+          "recall": 0.7994,
+          "f1": 0.2281
+        }
+      ],
+      "confusionMatrix": [
+        [
+          7894,
+          1767
+        ],
+        [
+          68,
+          271
+        ]
+      ]
+    },
+    "limitations": [
+      "The dataset is synthetic — UCI states it \"reflects\" industry data. It is not measured from this facility.",
+      "The failure-mode labels are documented deterministic functions of the input features, so this model demonstrates that the training pipeline learns those relationships. It is not evidence of predictive skill on real plant equipment.",
+      "Accuracy sits BELOW the majority-class baseline on purpose: balanced class weighting trades specificity for recall so that rare failures are not simply ignored. A model that always answered \"no failure\" would score 96.61% accuracy and catch nothing. Read precision, recall and the confusion matrix — not accuracy alone.",
+      "High recall comes at the price of false alarms: the classifier is a screening tool that flags candidates for inspection, not a confirmatory test.",
+      "Features include three physics-informed derivations (temperature gap, mechanical power, wear x strain) taken from the dataset documentation, not fitted from the labels.",
+      "RNF (random failure) is defined as independent of operating parameters; its near-zero measured precision is the expected outcome, not a bug.",
+      "Oriented toward rotating machinery (tool wear, torque, speed); transfer to other equipment is untested.",
+      "Decision support only — maintenance personnel make the final call (§24)."
+    ],
+    "trainedAt": "2026-09-26T07:02:43.746Z"
+  },
+  {
+    "id": "ai4i-twf",
+    "name": "TWF — Tool wear failure",
+    "description": "One-vs-rest logistic regression over AI4I operating parameters, fitted with balanced class weights and evaluated by 5-fold stratified cross-validation.",
+    "kind": "logistic-regression",
+    "layer": 3,
+    "status": "trained",
+    "task": "binary classification",
+    "dataset": {
+      "name": "AI4I 2020 Predictive Maintenance Dataset",
+      "source": "UCI Machine Learning Repository, dataset id 601",
+      "citation": "AI4I 2020 Predictive Maintenance Dataset [Dataset]. (2020). UCI ML Repository. https://doi.org/10.24432/C5HS5C",
+      "license": "CC BY 4.0",
+      "synthetic": true,
+      "samples": 10000,
+      "classBalance": {
+        "positive": 46,
+        "negative": 9954
+      },
+      "note": "Synthetic data that reflects real predictive maintenance scenarios. It is NOT measured at this institution and is never written into the plant database."
+    },
+    "features": [
+      "airTemperatureK",
+      "processTemperatureK",
+      "rotationalSpeedRpm",
+      "torqueNm",
+      "toolWearMin",
+      "productTypeL",
+      "productTypeM",
+      "productTypeH",
+      "temperatureGapK",
+      "mechanicalPowerW",
+      "wearStrainMinNm"
+    ],
+    "labels": [
+      "0",
+      "1"
+    ],
+    "training": {
+      "samples": 10000,
+      "features": 11,
+      "classes": 2,
+      "epochs": 150,
+      "learningRate": 0.5,
+      "l2": 0.01,
+      "stoppedAtEpoch": 150
+    },
+    "evaluation": {
+      "method": "5-fold stratified cross-validation",
+      "folds": 5,
+      "seed": 42,
+      "accuracy": 0.8237,
+      "macroF1": 0.4762,
+      "weightedF1": 0.8989,
+      "majorityClassBaseline": 0.9954,
+      "majorityClassLabel": "0",
+      "samples": 10000,
+      "labels": [
+        "0",
+        "1"
+      ],
+      "perClass": [
+        {
+          "label": "0",
+          "support": 9954,
+          "truePositives": 8191,
+          "falsePositives": 0,
+          "falseNegatives": 1763,
+          "precision": 1,
+          "recall": 0.8229,
+          "f1": 0.9028
+        },
+        {
+          "label": "1",
+          "support": 46,
+          "truePositives": 46,
+          "falsePositives": 1763,
+          "falseNegatives": 0,
+          "precision": 0.0254,
+          "recall": 1,
+          "f1": 0.0495
+        }
+      ],
+      "confusionMatrix": [
+        [
+          8191,
+          1763
+        ],
+        [
+          0,
+          46
+        ]
+      ]
+    },
+    "limitations": [
+      "The dataset is synthetic — UCI states it \"reflects\" industry data. It is not measured from this facility.",
+      "The failure-mode labels are documented deterministic functions of the input features, so this model demonstrates that the training pipeline learns those relationships. It is not evidence of predictive skill on real plant equipment.",
+      "Accuracy sits BELOW the majority-class baseline on purpose: balanced class weighting trades specificity for recall so that rare failures are not simply ignored. A model that always answered \"no failure\" would score 96.61% accuracy and catch nothing. Read precision, recall and the confusion matrix — not accuracy alone.",
+      "High recall comes at the price of false alarms: the classifier is a screening tool that flags candidates for inspection, not a confirmatory test.",
+      "Features include three physics-informed derivations (temperature gap, mechanical power, wear x strain) taken from the dataset documentation, not fitted from the labels.",
+      "RNF (random failure) is defined as independent of operating parameters; its near-zero measured precision is the expected outcome, not a bug.",
+      "Oriented toward rotating machinery (tool wear, torque, speed); transfer to other equipment is untested.",
+      "Decision support only — maintenance personnel make the final call (§24)."
+    ],
+    "trainedAt": "2026-09-26T07:02:44.563Z"
+  },
+  {
+    "id": "ai4i-hdf",
+    "name": "HDF — Heat dissipation failure",
+    "description": "One-vs-rest logistic regression over AI4I operating parameters, fitted with balanced class weights and evaluated by 5-fold stratified cross-validation.",
+    "kind": "logistic-regression",
+    "layer": 3,
+    "status": "trained",
+    "task": "binary classification",
+    "dataset": {
+      "name": "AI4I 2020 Predictive Maintenance Dataset",
+      "source": "UCI Machine Learning Repository, dataset id 601",
+      "citation": "AI4I 2020 Predictive Maintenance Dataset [Dataset]. (2020). UCI ML Repository. https://doi.org/10.24432/C5HS5C",
+      "license": "CC BY 4.0",
+      "synthetic": true,
+      "samples": 10000,
+      "classBalance": {
+        "positive": 115,
+        "negative": 9885
+      },
+      "note": "Synthetic data that reflects real predictive maintenance scenarios. It is NOT measured at this institution and is never written into the plant database."
+    },
+    "features": [
+      "airTemperatureK",
+      "processTemperatureK",
+      "rotationalSpeedRpm",
+      "torqueNm",
+      "toolWearMin",
+      "productTypeL",
+      "productTypeM",
+      "productTypeH",
+      "temperatureGapK",
+      "mechanicalPowerW",
+      "wearStrainMinNm"
+    ],
+    "labels": [
+      "0",
+      "1"
+    ],
+    "training": {
+      "samples": 10000,
+      "features": 11,
+      "classes": 2,
+      "epochs": 150,
+      "learningRate": 0.5,
+      "l2": 0.01,
+      "stoppedAtEpoch": 150
+    },
+    "evaluation": {
+      "method": "5-fold stratified cross-validation",
+      "folds": 5,
+      "seed": 42,
+      "accuracy": 0.9112,
+      "macroF1": 0.5794,
+      "weightedF1": 0.9444,
+      "majorityClassBaseline": 0.9885,
+      "majorityClassLabel": "0",
+      "samples": 10000,
+      "labels": [
+        "0",
+        "1"
+      ],
+      "perClass": [
+        {
+          "label": "0",
+          "support": 9885,
+          "truePositives": 8997,
+          "falsePositives": 0,
+          "falseNegatives": 888,
+          "precision": 1,
+          "recall": 0.9102,
+          "f1": 0.953
+        },
+        {
+          "label": "1",
+          "support": 115,
+          "truePositives": 115,
+          "falsePositives": 888,
+          "falseNegatives": 0,
+          "precision": 0.1147,
+          "recall": 1,
+          "f1": 0.2058
+        }
+      ],
+      "confusionMatrix": [
+        [
+          8997,
+          888
+        ],
+        [
+          0,
+          115
+        ]
+      ]
+    },
+    "limitations": [
+      "The dataset is synthetic — UCI states it \"reflects\" industry data. It is not measured from this facility.",
+      "The failure-mode labels are documented deterministic functions of the input features, so this model demonstrates that the training pipeline learns those relationships. It is not evidence of predictive skill on real plant equipment.",
+      "Accuracy sits BELOW the majority-class baseline on purpose: balanced class weighting trades specificity for recall so that rare failures are not simply ignored. A model that always answered \"no failure\" would score 96.61% accuracy and catch nothing. Read precision, recall and the confusion matrix — not accuracy alone.",
+      "High recall comes at the price of false alarms: the classifier is a screening tool that flags candidates for inspection, not a confirmatory test.",
+      "Features include three physics-informed derivations (temperature gap, mechanical power, wear x strain) taken from the dataset documentation, not fitted from the labels.",
+      "RNF (random failure) is defined as independent of operating parameters; its near-zero measured precision is the expected outcome, not a bug.",
+      "Oriented toward rotating machinery (tool wear, torque, speed); transfer to other equipment is untested.",
+      "Decision support only — maintenance personnel make the final call (§24)."
+    ],
+    "trainedAt": "2026-09-26T07:02:45.385Z"
+  },
+  {
+    "id": "ai4i-pwf",
+    "name": "PWF — Power failure",
+    "description": "One-vs-rest logistic regression over AI4I operating parameters, fitted with balanced class weights and evaluated by 5-fold stratified cross-validation.",
+    "kind": "logistic-regression",
+    "layer": 3,
+    "status": "trained",
+    "task": "binary classification",
+    "dataset": {
+      "name": "AI4I 2020 Predictive Maintenance Dataset",
+      "source": "UCI Machine Learning Repository, dataset id 601",
+      "citation": "AI4I 2020 Predictive Maintenance Dataset [Dataset]. (2020). UCI ML Repository. https://doi.org/10.24432/C5HS5C",
+      "license": "CC BY 4.0",
+      "synthetic": true,
+      "samples": 10000,
+      "classBalance": {
+        "positive": 95,
+        "negative": 9905
+      },
+      "note": "Synthetic data that reflects real predictive maintenance scenarios. It is NOT measured at this institution and is never written into the plant database."
+    },
+    "features": [
+      "airTemperatureK",
+      "processTemperatureK",
+      "rotationalSpeedRpm",
+      "torqueNm",
+      "toolWearMin",
+      "productTypeL",
+      "productTypeM",
+      "productTypeH",
+      "temperatureGapK",
+      "mechanicalPowerW",
+      "wearStrainMinNm"
+    ],
+    "labels": [
+      "0",
+      "1"
+    ],
+    "training": {
+      "samples": 10000,
+      "features": 11,
+      "classes": 2,
+      "epochs": 150,
+      "learningRate": 0.5,
+      "l2": 0.01,
+      "stoppedAtEpoch": 150
+    },
+    "evaluation": {
+      "method": "5-fold stratified cross-validation",
+      "folds": 5,
+      "seed": 42,
+      "accuracy": 0.96,
+      "macroF1": 0.6472,
+      "weightedF1": 0.9731,
+      "majorityClassBaseline": 0.9905,
+      "majorityClassLabel": "0",
+      "samples": 10000,
+      "labels": [
+        "0",
+        "1"
+      ],
+      "perClass": [
+        {
+          "label": "0",
+          "support": 9905,
+          "truePositives": 9508,
+          "falsePositives": 3,
+          "falseNegatives": 397,
+          "precision": 0.9997,
+          "recall": 0.9599,
+          "f1": 0.9794
+        },
+        {
+          "label": "1",
+          "support": 95,
+          "truePositives": 92,
+          "falsePositives": 397,
+          "falseNegatives": 3,
+          "precision": 0.1881,
+          "recall": 0.9684,
+          "f1": 0.315
+        }
+      ],
+      "confusionMatrix": [
+        [
+          9508,
+          397
+        ],
+        [
+          3,
+          92
+        ]
+      ]
+    },
+    "limitations": [
+      "The dataset is synthetic — UCI states it \"reflects\" industry data. It is not measured from this facility.",
+      "The failure-mode labels are documented deterministic functions of the input features, so this model demonstrates that the training pipeline learns those relationships. It is not evidence of predictive skill on real plant equipment.",
+      "Accuracy sits BELOW the majority-class baseline on purpose: balanced class weighting trades specificity for recall so that rare failures are not simply ignored. A model that always answered \"no failure\" would score 96.61% accuracy and catch nothing. Read precision, recall and the confusion matrix — not accuracy alone.",
+      "High recall comes at the price of false alarms: the classifier is a screening tool that flags candidates for inspection, not a confirmatory test.",
+      "Features include three physics-informed derivations (temperature gap, mechanical power, wear x strain) taken from the dataset documentation, not fitted from the labels.",
+      "RNF (random failure) is defined as independent of operating parameters; its near-zero measured precision is the expected outcome, not a bug.",
+      "Oriented toward rotating machinery (tool wear, torque, speed); transfer to other equipment is untested.",
+      "Decision support only — maintenance personnel make the final call (§24)."
+    ],
+    "trainedAt": "2026-09-26T07:02:46.196Z"
+  },
+  {
+    "id": "ai4i-osf",
+    "name": "OSF — Overstrain failure",
+    "description": "One-vs-rest logistic regression over AI4I operating parameters, fitted with balanced class weights and evaluated by 5-fold stratified cross-validation.",
+    "kind": "logistic-regression",
+    "layer": 3,
+    "status": "trained",
+    "task": "binary classification",
+    "dataset": {
+      "name": "AI4I 2020 Predictive Maintenance Dataset",
+      "source": "UCI Machine Learning Repository, dataset id 601",
+      "citation": "AI4I 2020 Predictive Maintenance Dataset [Dataset]. (2020). UCI ML Repository. https://doi.org/10.24432/C5HS5C",
+      "license": "CC BY 4.0",
+      "synthetic": true,
+      "samples": 10000,
+      "classBalance": {
+        "positive": 98,
+        "negative": 9902
+      },
+      "note": "Synthetic data that reflects real predictive maintenance scenarios. It is NOT measured at this institution and is never written into the plant database."
+    },
+    "features": [
+      "airTemperatureK",
+      "processTemperatureK",
+      "rotationalSpeedRpm",
+      "torqueNm",
+      "toolWearMin",
+      "productTypeL",
+      "productTypeM",
+      "productTypeH",
+      "temperatureGapK",
+      "mechanicalPowerW",
+      "wearStrainMinNm"
+    ],
+    "labels": [
+      "0",
+      "1"
+    ],
+    "training": {
+      "samples": 10000,
+      "features": 11,
+      "classes": 2,
+      "epochs": 150,
+      "learningRate": 0.5,
+      "l2": 0.01,
+      "stoppedAtEpoch": 150
+    },
+    "evaluation": {
+      "method": "5-fold stratified cross-validation",
+      "folds": 5,
+      "seed": 42,
+      "accuracy": 0.9394,
+      "macroF1": 0.6064,
+      "weightedF1": 0.9613,
+      "majorityClassBaseline": 0.9902,
+      "majorityClassLabel": "0",
+      "samples": 10000,
+      "labels": [
+        "0",
+        "1"
+      ],
+      "perClass": [
+        {
+          "label": "0",
+          "support": 9902,
+          "truePositives": 9296,
+          "falsePositives": 0,
+          "falseNegatives": 606,
+          "precision": 1,
+          "recall": 0.9388,
+          "f1": 0.9684
+        },
+        {
+          "label": "1",
+          "support": 98,
+          "truePositives": 98,
+          "falsePositives": 606,
+          "falseNegatives": 0,
+          "precision": 0.1392,
+          "recall": 1,
+          "f1": 0.2444
+        }
+      ],
+      "confusionMatrix": [
+        [
+          9296,
+          606
+        ],
+        [
+          0,
+          98
+        ]
+      ]
+    },
+    "limitations": [
+      "The dataset is synthetic — UCI states it \"reflects\" industry data. It is not measured from this facility.",
+      "The failure-mode labels are documented deterministic functions of the input features, so this model demonstrates that the training pipeline learns those relationships. It is not evidence of predictive skill on real plant equipment.",
+      "Accuracy sits BELOW the majority-class baseline on purpose: balanced class weighting trades specificity for recall so that rare failures are not simply ignored. A model that always answered \"no failure\" would score 96.61% accuracy and catch nothing. Read precision, recall and the confusion matrix — not accuracy alone.",
+      "High recall comes at the price of false alarms: the classifier is a screening tool that flags candidates for inspection, not a confirmatory test.",
+      "Features include three physics-informed derivations (temperature gap, mechanical power, wear x strain) taken from the dataset documentation, not fitted from the labels.",
+      "RNF (random failure) is defined as independent of operating parameters; its near-zero measured precision is the expected outcome, not a bug.",
+      "Oriented toward rotating machinery (tool wear, torque, speed); transfer to other equipment is untested.",
+      "Decision support only — maintenance personnel make the final call (§24)."
+    ],
+    "trainedAt": "2026-09-26T07:02:46.971Z"
+  },
+  {
+    "id": "ai4i-rnf",
+    "name": "RNF — Random failure",
+    "description": "One-vs-rest logistic regression over AI4I operating parameters, fitted with balanced class weights and evaluated by 5-fold stratified cross-validation.",
+    "kind": "logistic-regression",
+    "layer": 3,
+    "status": "trained",
+    "task": "binary classification",
+    "dataset": {
+      "name": "AI4I 2020 Predictive Maintenance Dataset",
+      "source": "UCI Machine Learning Repository, dataset id 601",
+      "citation": "AI4I 2020 Predictive Maintenance Dataset [Dataset]. (2020). UCI ML Repository. https://doi.org/10.24432/C5HS5C",
+      "license": "CC BY 4.0",
+      "synthetic": true,
+      "samples": 10000,
+      "classBalance": {
+        "positive": 19,
+        "negative": 9981
+      },
+      "note": "Synthetic data that reflects real predictive maintenance scenarios. It is NOT measured at this institution and is never written into the plant database."
+    },
+    "features": [
+      "airTemperatureK",
+      "processTemperatureK",
+      "rotationalSpeedRpm",
+      "torqueNm",
+      "toolWearMin",
+      "productTypeL",
+      "productTypeM",
+      "productTypeH",
+      "temperatureGapK",
+      "mechanicalPowerW",
+      "wearStrainMinNm"
+    ],
+    "labels": [
+      "0",
+      "1"
+    ],
+    "training": {
+      "samples": 10000,
+      "features": 11,
+      "classes": 2,
+      "epochs": 150,
+      "learningRate": 0.5,
+      "l2": 0.01,
+      "stoppedAtEpoch": 150
+    },
+    "evaluation": {
+      "method": "5-fold stratified cross-validation",
+      "folds": 5,
+      "seed": 42,
+      "accuracy": 0.6835,
+      "macroF1": 0.4087,
+      "weightedF1": 0.8103,
+      "majorityClassBaseline": 0.9981,
+      "majorityClassLabel": "0",
+      "samples": 10000,
+      "labels": [
+        "0",
+        "1"
+      ],
+      "perClass": [
+        {
+          "label": "0",
+          "support": 9981,
+          "truePositives": 6826,
+          "falsePositives": 10,
+          "falseNegatives": 3155,
+          "precision": 0.9985,
+          "recall": 0.6839,
+          "f1": 0.8118
+        },
+        {
+          "label": "1",
+          "support": 19,
+          "truePositives": 9,
+          "falsePositives": 3155,
+          "falseNegatives": 10,
+          "precision": 0.0028,
+          "recall": 0.4737,
+          "f1": 0.0056
+        }
+      ],
+      "confusionMatrix": [
+        [
+          6826,
+          3155
+        ],
+        [
+          10,
+          9
+        ]
+      ]
+    },
+    "limitations": [
+      "The dataset is synthetic — UCI states it \"reflects\" industry data. It is not measured from this facility.",
+      "The failure-mode labels are documented deterministic functions of the input features, so this model demonstrates that the training pipeline learns those relationships. It is not evidence of predictive skill on real plant equipment.",
+      "Accuracy sits BELOW the majority-class baseline on purpose: balanced class weighting trades specificity for recall so that rare failures are not simply ignored. A model that always answered \"no failure\" would score 96.61% accuracy and catch nothing. Read precision, recall and the confusion matrix — not accuracy alone.",
+      "High recall comes at the price of false alarms: the classifier is a screening tool that flags candidates for inspection, not a confirmatory test.",
+      "Features include three physics-informed derivations (temperature gap, mechanical power, wear x strain) taken from the dataset documentation, not fitted from the labels.",
+      "RNF (random failure) is defined as independent of operating parameters; its near-zero measured precision is the expected outcome, not a bug.",
+      "Oriented toward rotating machinery (tool wear, torque, speed); transfer to other equipment is untested.",
+      "Decision support only — maintenance personnel make the final call (§24)."
+    ],
+    "trainedAt": "2026-09-26T07:02:47.756Z"
+  }
+]

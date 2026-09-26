@@ -25,6 +25,9 @@ export default function TabsLayout() {
       <Tabs.Screen name="cases" options={{ title: 'Cases', tabBarIcon: icon('clipboard-outline') }} />
       <Tabs.Screen name="testing" options={{ title: 'Testing', tabBarIcon: icon('flask-outline') }} />
       <Tabs.Screen name="reports" options={{ title: 'Reports', tabBarIcon: icon('bar-chart-outline') }} />
+      {/* Reachable from the Dashboard and Settings; kept out of the bar so the six
+          working tabs keep readable labels on a phone-sized screen. */}
+      <Tabs.Screen name="models" options={{ title: 'ML models', href: null }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: icon('settings-outline') }} />
     </Tabs>
   );

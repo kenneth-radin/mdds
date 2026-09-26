@@ -1,7 +1,7 @@
 import { IMachine } from '../models/Machine';
 import { IAnalysisSuggestion, IHistoryStatistics } from '../models/MaintenanceCase';
 import { MachineHistory, computeStatistics } from './historyService';
-import { ComparableCase, findComparableCases } from './comparableCaseService';
+import { ComparableCase, SIMILARITY_METHOD, findComparableCases } from './comparableCaseService';
 import { round } from '../utils/helpers';
 
 export const MIN_COMPARABLE_RECORDS = 3;
@@ -106,6 +106,7 @@ export function analyzeMaintenanceCase(
     `${history.operationalRecords.length} operational data record(s)`,
     `${history.completedCases.length} completed case(s)`,
     `${comparable.length} comparable record(s)`,
+    `similarity method: ${SIMILARITY_METHOD}`,
     `machine profile: ${machine.machineId} / ${machine.machineType}`
   ];
 

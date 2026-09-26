@@ -4,8 +4,8 @@ import { TestingCase } from '../models/TestingCase';
 import { asyncHandler } from '../middleware/error';
 import { requireAuth } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
-import { resolveMachine } from '../utils/helpers';
-import { jaccard, normalizeTokens, round } from '../utils/helpers';
+import { round, resolveMachine } from '../utils/helpers';
+import { textSimilarity } from '../services/ml/tfidf';
 
 const router = Router();
 router.use(requireAuth);
@@ -47,9 +47,10 @@ router.post(
     const body = req.body as z.infer<typeof testingSchema>;
     const machine = await resolveMachine(body.machine);
 
-    // Match score is computed from the actual compared text when the researcher does
-    // not supply one. It is a deterministic token overlap, never a fabricated value.
-    const similarity = jaccard(normalizeTokens(body.expectedSuggestion), normalizeTokens(body.actualSuggestion));
+    // Match score is computed from the actually compared text when the researcher
+    // does not supply one. It uses the same TF-IDF cosine method as Layer 1 so the
+    // whole system scores text identically, and the value is never fabricated.
+    const similarity = textSimilarity(body.expectedSuggestion, body.actualSuggestion);
     const matchScore = body.matchScore ?? round(similarity * 100, 1);
 
     const record = await TestingCase.create({
