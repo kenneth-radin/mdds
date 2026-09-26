@@ -115,6 +115,11 @@ async function main() {
     analysis.suggestions.length > 0 && analysis.suggestions[0].sourceRecordIds.length >= 3,
     `evidence=${analysis.suggestions[0] ? analysis.suggestions[0].sourceRecordIds.length : 0} confidence=${analysis.suggestions[0] ? analysis.suggestions[0].confidence : 0}%`
   );
+  check(
+    'suggestion carries human-friendly evidence strings',
+    analysis.suggestions.length > 0 && Array.isArray(analysis.suggestions[0].evidence) && analysis.suggestions[0].evidence.length >= 1,
+    `sample="${analysis.suggestions[0] && analysis.suggestions[0].evidence ? analysis.suggestions[0].evidence[0] : 'none'}"`
+  );
 
   const review = await call(`/api/maintenance-cases/${caseId}/review`, {
     method: 'PUT',
