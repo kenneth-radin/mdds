@@ -258,8 +258,8 @@ export default function SettingsScreen() {
           subtitle="Layer 3 benchmark models"
         />
         <Muted>
-          Model cards with dataset, licence, per-class metrics, confusion matrices and stated limitations, plus a form
-          that scores entered operating parameters with the trained classifiers.
+          A form that scores entered operating parameters with the trained AI4I 2020 benchmark classifiers; every
+          prediction carries the measured metrics behind it.
         </Muted>
         <Button
           title="Open AI predictions"

@@ -165,36 +165,29 @@ export function StatCard({
       ]}
     >
       <View style={s.statCardTop}>
-        <Text style={s.statLabel} numberOfLines={1}>
-          {label}
-        </Text>
+        <Text style={s.statLabel}>{label}</Text>
         {icon ? (
           <Ionicons
             name={icon}
             size={18}
             color={tone === 'primary' ? theme.primary : theme.textMuted}
+            style={{ marginLeft: theme.space.xs }}
           />
         ) : null}
       </View>
-      <Text style={[s.statValue, tone === 'primary' ? { color: theme.primary } : null]} numberOfLines={1}>
-        {value}
-      </Text>
-      {hint ? (
-        <Text style={s.statHint} numberOfLines={1}>
-          {hint}
-        </Text>
-      ) : null}
+      <Text style={[s.statValue, tone === 'primary' ? { color: theme.primary } : null]}>{value}</Text>
+      {hint ? <Text style={s.statHint}>{hint}</Text> : null}
     </View>
   );
 
   if (onPress) {
     return (
-      <Pressable onPress={onPress} style={{ flex: 1 }}>
+      <Pressable onPress={onPress} style={s.statCardCell}>
         {content}
       </Pressable>
     );
   }
-  return <View style={{ flex: 1 }}>{content}</View>;
+  return <View style={s.statCardCell}>{content}</View>;
 }
 
 export function Title({ children, style }: { children: React.ReactNode; style?: TextStyle }) {
@@ -351,9 +344,7 @@ export function IconAction({
       ]}
     >
       <Ionicons name={icon} size={16} color={palette.fg} />
-      <Text style={[s.iconActionLabel, { color: palette.fg }]} numberOfLines={1}>
-        {label}
-      </Text>
+      <Text style={[s.iconActionLabel, { color: palette.fg }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -536,9 +527,7 @@ export function Chip({
   return (
     <View style={[s.chip, { backgroundColor: palette.bg, borderColor: palette.border }]}>
       {icon ? <Ionicons name={icon} size={13} color={palette.fg} style={{ marginRight: 4 }} /> : null}
-      <Text style={[s.chipText, { color: palette.fg }]} numberOfLines={1}>
-        {label}
-      </Text>
+      <Text style={[s.chipText, { color: palette.fg }]}>{label}</Text>
     </View>
   );
 }
@@ -782,6 +771,15 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     ...theme.shadow.card
   },
+  // Sizing cell for a card inside a statRow. flexBasis gives Yoga a real
+  // hypothetical width (flex: 1 would use 0 and never wrap): a 3-card row wraps
+  // to 2 + 1 when the screen is too narrow for three readable columns, and every
+  // card grows to fill the line it lands on. Text inside is free to wrap.
+  statCardCell: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 132
+  },
   statCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -896,7 +894,10 @@ const s = StyleSheet.create({
     borderWidth: 1
   },
   iconActionLabel: {
-    ...theme.font.captionMedium
+    ...theme.font.captionMedium,
+    // actionRow already wraps its buttons; this lets a long label inside one
+    // button wrap instead of being cut with an ellipsis.
+    flexShrink: 1
   },
   actionRow: {
     flexDirection: 'row',
@@ -1016,7 +1017,9 @@ const s = StyleSheet.create({
   },
   chipText: {
     fontSize: 12,
-    color: theme.textSecondary
+    color: theme.textSecondary,
+    // Long chip labels wrap onto a second line instead of ending in "…".
+    flexShrink: 1
   },
 
   // Banners

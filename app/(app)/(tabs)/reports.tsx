@@ -249,6 +249,7 @@ export default function ReportsScreen() {
 const st = StyleSheet.create({
   statRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.space.md
   }
 });

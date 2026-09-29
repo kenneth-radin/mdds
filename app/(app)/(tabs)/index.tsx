@@ -168,8 +168,7 @@ export default function DashboardScreen() {
         />
         <Muted>
           Trained offline on the AI4I 2020 synthetic benchmark dataset — never mixed with this facility's records.
-          Open a model card to read its metrics, confusion matrix and stated limitations, or score entered operating
-          parameters.
+          Score entered operating parameters to get a failure probability from each classifier.
         </Muted>
         <Button
           title="Open AI predictions"
@@ -185,6 +184,7 @@ export default function DashboardScreen() {
 const st = StyleSheet.create({
   statRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.space.md
   }
 });
