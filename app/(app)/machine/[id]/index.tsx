@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Badge,
@@ -35,6 +35,11 @@ export default function MachineDetailScreen() {
   const [counts, setCounts] = useState({ maintenanceRecords: 0, failureRecords: 0, operationalRecords: 0, cases: 0 });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  // Two-step delete confirmation rendered inline. The previous flow opened a
+  // native Alert dialog, which some devices silently drop — the button then
+  // looked dead. An on-screen confirmation always reacts to the first tap.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,22 +61,26 @@ export default function MachineDetailScreen() {
     }, [load])
   );
 
-  const remove = () => {
-    Alert.alert('Delete machine', 'This removes the machine and all of its records. Continue?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await api.del(`/api/machines/${id}`);
-            router.replace('/(app)/(tabs)/machines');
-          } catch (err) {
-            setError(errorMessage(err));
-          }
-        }
-      }
-    ]);
+  const askDelete = () => {
+    console.log('[machine] delete requested: showing inline confirmation');
+    setError('');
+    setConfirmingDelete(true);
+  };
+
+  const confirmDelete = async () => {
+    console.log('[machine] delete confirmed: sending request');
+    setDeleting(true);
+    try {
+      await api.del(`/api/machines/${id}`);
+      console.log('[machine] delete succeeded');
+      router.replace('/(app)/(tabs)/machines');
+    } catch (err) {
+      console.log('[machine] delete failed:', err);
+      setError(errorMessage(err));
+      setConfirmingDelete(false);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (loading && !machine) {
@@ -212,7 +221,32 @@ export default function MachineDetailScreen() {
         />
       </ButtonGroup>
 
-      <Button title="Delete machine" variant="danger" icon="trash-outline" onPress={remove} />
+      {confirmingDelete ? (
+        <Notice tone="danger" title="Delete this machine?">
+          This permanently removes the machine and all of its maintenance, failure and operational records. Press
+          "Confirm delete" to go ahead, or Cancel to keep it.
+        </Notice>
+      ) : null}
+      {confirmingDelete ? (
+        <View style={st.deleteRow}>
+          <Button
+            title="Cancel"
+            variant="outline"
+            style={{ flex: 1, marginRight: theme.space.sm }}
+            onPress={() => setConfirmingDelete(false)}
+          />
+          <Button
+            title="Confirm delete"
+            variant="danger"
+            icon="trash-outline"
+            loading={deleting}
+            style={{ flex: 1 }}
+            onPress={confirmDelete}
+          />
+        </View>
+      ) : (
+        <Button title="Delete machine" variant="danger" icon="trash-outline" onPress={askDelete} />
+      )}
     </Screen>
   );
 }
@@ -224,5 +258,9 @@ const st = StyleSheet.create({
     // of three crushed columns.
     flexWrap: 'wrap',
     gap: theme.space.md
+  },
+  deleteRow: {
+    flexDirection: 'row',
+    marginTop: theme.space.sm
   }
 });

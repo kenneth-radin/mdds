@@ -14,7 +14,6 @@ import {
 } from '../../components/ui';
 import { useAuth } from '../../lib/auth';
 import { errorMessage } from '../../lib/api';
-import { API_URL } from '../../lib/config';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -42,9 +41,6 @@ export default function LoginScreen() {
           <Ionicons name="construct-outline" size={26} color={theme.primary} />
         </View>
         <View style={{ flex: 1 }}>
-          <View style={st.tagRow}>
-            <Chip label="Capstone project" icon="school-outline" />
-          </View>
           <Text style={st.brandTag}>Machines · cases · evidence-backed suggestions</Text>
         </View>
       </View>
@@ -87,10 +83,6 @@ export default function LoginScreen() {
           </Link>
         </View>
       </Card>
-
-      <View style={st.footer}>
-        <Chip label={`API: ${API_URL.replace(/^https?:\/\//, '')}`} icon="server-outline" />
-      </View>
     </Screen>
   );
 }
@@ -110,17 +102,9 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  tagRow: {
-    flexDirection: 'row',
-    marginBottom: theme.space.xs
-  },
   brandTag: {
     ...theme.font.caption,
     color: theme.textMuted
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: theme.space.lg
   }
 });
 
