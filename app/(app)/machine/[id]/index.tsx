@@ -220,6 +220,9 @@ export default function MachineDetailScreen() {
 const st = StyleSheet.create({
   statRow: {
     flexDirection: 'row',
+    // Same reflow rule as the other screens: narrow phones get 2+1 instead
+    // of three crushed columns.
+    flexWrap: 'wrap',
     gap: theme.space.md
   }
 });

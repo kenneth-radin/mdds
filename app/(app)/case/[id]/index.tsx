@@ -551,6 +551,9 @@ export default function CaseDetailScreen() {
 const st = StyleSheet.create({
   statRow: {
     flexDirection: 'row',
+    // Reflow 3-card rows to 2+1 instead of shrinking every card when the
+    // screen is too narrow for three readable columns.
+    flexWrap: 'wrap',
     gap: theme.space.md
   },
   suggestionHead: {

@@ -630,7 +630,7 @@ export function Loading({ label = 'Loading…', caption }: { label?: string; cap
 export function KeyValue({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <View style={s.kvRow}>
-      <View style={{ flex: 1, marginRight: theme.space.sm }}>
+      <View style={s.kvLabelBox}>
         <Text style={s.kvLabel}>{label}</Text>
         {hint ? <Text style={s.kvHint}>{hint}</Text> : null}
       </View>
@@ -722,7 +722,9 @@ const s = StyleSheet.create({
   },
   sectionTitle: {
     ...theme.font.section,
-    color: theme.text
+    color: theme.text,
+    // Shrink beside an optional action button instead of pushing it out.
+    flexShrink: 1
   },
   sectionSubtitle: {
     ...theme.font.caption,
@@ -1107,10 +1109,20 @@ const s = StyleSheet.create({
     color: theme.textSubtle,
     marginTop: 1
   },
+  kvLabelBox: {
+    // The label column wraps its own text but can never be crushed: the old
+    // flex: 1 gave it a zero basis, so a long value squeezed labels like
+    // "Expected suggestion" into a one-letter vertical strip.
+    flexShrink: 1,
+    maxWidth: '45%',
+    marginRight: theme.space.sm
+  },
   kvValue: {
     ...theme.font.captionMedium,
     color: theme.text,
-    flexShrink: 1,
+    // Grows into the space beside the label and wraps long values instead of
+    // taking its full text width and crushing the label.
+    flex: 1,
     textAlign: 'right'
   },
 
