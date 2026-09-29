@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   ActionRow,
@@ -185,6 +185,10 @@ export default function MaintenanceHistoryScreen() {
   const [editForm, setEditForm] = useState<MaintenanceForm>(EMPTY_FORM);
   const [editType, setEditType] = useState<(typeof types)[number]>('corrective');
   const [savingId, setSavingId] = useState<string | null>(null);
+  // Removal is confirmed inline: the native Alert dialog this screen used to
+  // open never renders on some devices, which made the Remove button look dead.
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
@@ -270,30 +274,27 @@ export default function MaintenanceHistoryScreen() {
     }
   };
 
-  const removeRecord = (record: MaintenanceRecord) => {
-    Alert.alert(
-      'Remove maintenance record',
-      `Delete the ${fmtDate(record.date)} ${record.maintenanceType} record? Future analyses will no longer see it.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setError('');
-            setFeedback('');
-            try {
-              await api.del(`/api/maintenance/${record._id}`);
-              if (editingId === record._id) setEditingId(null);
-              setFeedback('Maintenance record removed.');
-              await load();
-            } catch (err) {
-              setError(errorMessage(err));
-            }
-          }
-        }
-      ]
-    );
+  const askRemove = (record: MaintenanceRecord) => {
+    setError('');
+    setFeedback('');
+    setPendingRemoveId(record._id);
+  };
+
+  const removeRecord = async (record: MaintenanceRecord) => {
+    setRemovingId(record._id);
+    setError('');
+    setFeedback('');
+    try {
+      await api.del(`/api/maintenance/${record._id}`);
+      setPendingRemoveId(null);
+      if (editingId === record._id) setEditingId(null);
+      setFeedback('Maintenance record removed.');
+      await load();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   return (
@@ -394,15 +395,29 @@ export default function MaintenanceHistoryScreen() {
                     {record.technician ? <Chip label={record.technician} icon="person-outline" /> : null}
                   </View>
                   <Divider />
-                  <ActionRow>
-                    <IconAction
-                      icon="trash-outline"
-                      label="Remove"
-                      tone="danger"
-                      onPress={() => removeRecord(record)}
-                    />
-                    <IconAction icon="create-outline" label="Edit" tone="primary" onPress={() => startEdit(record)} />
-                  </ActionRow>
+                  {pendingRemoveId === record._id ? (
+                    <>
+                      <Notice tone="danger" title="Remove maintenance record?">
+                        Delete the {fmtDate(record.date)} {record.maintenanceType} record? Future analyses will no
+                        longer see it. This cannot be undone.
+                      </Notice>
+                      <ActionRow>
+                        <IconAction icon="close-outline" label="Cancel" onPress={() => setPendingRemoveId(null)} />
+                        <IconAction
+                          icon="checkmark-outline"
+                          label={removingId === record._id ? 'Removing…' : 'Confirm remove'}
+                          tone="danger"
+                          disabled={removingId === record._id}
+                          onPress={() => void removeRecord(record)}
+                        />
+                      </ActionRow>
+                    </>
+                  ) : (
+                    <ActionRow>
+                      <IconAction icon="trash-outline" label="Remove" tone="danger" onPress={() => askRemove(record)} />
+                      <IconAction icon="create-outline" label="Edit" tone="primary" onPress={() => startEdit(record)} />
+                    </ActionRow>
+                  )}
                 </>
               )}
             </Card>

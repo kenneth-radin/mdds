@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
   ActionRow,
@@ -50,7 +50,7 @@ function roleLabel(role: RoleChoice): string {
  * not an admin, which is why the whole card renders only for admins.
  */
 function TeamSection() {
-  const { user: me, refreshUser } = useAuth();
+  const { user: me, refreshUser, signOut } = useAuth();
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -58,6 +58,10 @@ function TeamSection() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftRole, setDraftRole] = useState<RoleChoice>('technician');
   const [savingId, setSavingId] = useState<string | null>(null);
+  // Deletion is confirmed inline rather than through a native Alert dialog,
+  // which never renders on some devices and makes the button look dead.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,6 +116,33 @@ function TeamSection() {
     }
   };
 
+  const askDelete = (account: AuthUser) => {
+    setError('');
+    setFeedback('');
+    setPendingDeleteId(account.id);
+  };
+
+  const confirmDelete = async (account: AuthUser) => {
+    setDeletingId(account.id);
+    setError('');
+    try {
+      await api.del(`/api/auth/users/${account.id}`);
+      setPendingDeleteId(null);
+      if (account.id === me?.id) {
+        // The token stored on this device belongs to the account that no longer
+        // exists, so end the session instead of leaving it to fail on its own.
+        await signOut();
+        return;
+      }
+      setFeedback(`${account.name || account.username}'s account was deleted. Their records remain.`);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <Card>
       <SectionHeader
@@ -126,7 +157,7 @@ function TeamSection() {
         </Notice>
       ) : null}
       {feedback ? (
-        <Notice tone="success" title="Role updated">
+        <Notice tone="success" title="Done">
           {feedback}
         </Notice>
       ) : null}
@@ -178,6 +209,24 @@ function TeamSection() {
                       />
                     </ActionRow>
                   </>
+                ) : pendingDeleteId === account.id ? (
+                  <>
+                    <Notice tone="danger" title="Delete this account?">
+                      {account.name || account.username} loses access immediately
+                      {account.id === me?.id ? ', including the session on this device' : ''}. Records they created
+                      stay in the database. This cannot be undone.
+                    </Notice>
+                    <ActionRow>
+                      <IconAction icon="close-outline" label="Cancel" onPress={() => setPendingDeleteId(null)} />
+                      <IconAction
+                        icon="trash-outline"
+                        label={deletingId === account.id ? 'Deleting…' : 'Confirm delete'}
+                        tone="danger"
+                        disabled={deletingId === account.id}
+                        onPress={() => void confirmDelete(account)}
+                      />
+                    </ActionRow>
+                  </>
                 ) : (
                   <ActionRow>
                     <Text style={st.accountEmail}>{account.email}</Text>
@@ -187,6 +236,7 @@ function TeamSection() {
                       tone="primary"
                       onPress={() => startEdit(account)}
                     />
+                    <IconAction icon="trash-outline" label="Delete" tone="danger" onPress={() => askDelete(account)} />
                   </ActionRow>
                 )}
               </View>
@@ -197,7 +247,8 @@ function TeamSection() {
 
       <Notice tone="info" title="When a change takes effect">
         The role travels inside the JWT, so somebody who changes role keeps the access of the session they are already
-        signed in with until they sign out and back in. The backend also refuses to demote the last remaining admin.
+        signed in with until they sign out and back in. The backend refuses to demote or delete the last remaining
+        admin. Deleting an account revokes access but keeps the records that account created.
       </Notice>
     </Card>
   );
@@ -206,13 +257,10 @@ function TeamSection() {
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
-
-  const confirmSignOut = () => {
-    Alert.alert('Sign out', 'End the current session on this device?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => { void signOut(); } }
-    ]);
-  };
+  // Sign-out is confirmed inline like every other destructive action here: the
+  // native Alert dialog it used to open never renders on some devices, which
+  // made the button look broken.
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
 
   return (
     <Screen>
@@ -269,7 +317,30 @@ export default function SettingsScreen() {
         />
       </Card>
 
-      <Button title="Sign out" variant="danger" icon="log-out-outline" onPress={confirmSignOut} />
+      {confirmingSignOut ? (
+        <Notice tone="danger" title="End this session?">
+          The sign-in token stored on this device is removed. You can sign in again at any time.
+        </Notice>
+      ) : null}
+      {confirmingSignOut ? (
+        <View style={st.signOutRow}>
+          <Button
+            title="Cancel"
+            variant="outline"
+            style={{ flex: 1, marginRight: theme.space.sm }}
+            onPress={() => setConfirmingSignOut(false)}
+          />
+          <Button
+            title="Confirm sign out"
+            variant="danger"
+            icon="log-out-outline"
+            style={{ flex: 1 }}
+            onPress={() => void signOut()}
+          />
+        </View>
+      ) : (
+        <Button title="Sign out" variant="danger" icon="log-out-outline" onPress={() => setConfirmingSignOut(true)} />
+      )}
     </Screen>
   );
 }
@@ -303,5 +374,8 @@ const st = StyleSheet.create({
     color: theme.textMuted,
     flex: 1,
     marginRight: theme.space.sm
+  },
+  signOutRow: {
+    flexDirection: 'row'
   }
 });

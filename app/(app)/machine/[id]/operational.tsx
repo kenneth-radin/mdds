@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   ActionRow,
@@ -141,6 +141,10 @@ export default function OperationalDataScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<OperationalForm>(EMPTY_FORM);
   const [savingId, setSavingId] = useState<string | null>(null);
+  // Removal is confirmed inline: the native Alert dialog this screen used to
+  // open never renders on some devices, which made the Remove button look dead.
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
@@ -224,30 +228,27 @@ export default function OperationalDataScreen() {
     }
   };
 
-  const removeRecord = (record: OperationalRecord) => {
-    Alert.alert(
-      'Remove operational record',
-      `Delete the operational reading for ${fmtDate(record.date)}? History statistics will be recalculated without it.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setError('');
-            setFeedback('');
-            try {
-              await api.del(`/api/operational-data/${record._id}`);
-              if (editingId === record._id) setEditingId(null);
-              setFeedback('Operational record removed.');
-              await load();
-            } catch (err) {
-              setError(errorMessage(err));
-            }
-          }
-        }
-      ]
-    );
+  const askRemove = (record: OperationalRecord) => {
+    setError('');
+    setFeedback('');
+    setPendingRemoveId(record._id);
+  };
+
+  const removeRecord = async (record: OperationalRecord) => {
+    setRemovingId(record._id);
+    setError('');
+    setFeedback('');
+    try {
+      await api.del(`/api/operational-data/${record._id}`);
+      setPendingRemoveId(null);
+      if (editingId === record._id) setEditingId(null);
+      setFeedback('Operational record removed.');
+      await load();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setRemovingId(null);
+    }
   };
 
   return (
@@ -334,15 +335,29 @@ export default function OperationalDataScreen() {
                   />
                   {record.notes ? <KeyValue label="Notes" value={record.notes} /> : null}
                   <Divider />
-                  <ActionRow>
-                    <IconAction
-                      icon="trash-outline"
-                      label="Remove"
-                      tone="danger"
-                      onPress={() => removeRecord(record)}
-                    />
-                    <IconAction icon="create-outline" label="Edit" tone="primary" onPress={() => startEdit(record)} />
-                  </ActionRow>
+                  {pendingRemoveId === record._id ? (
+                    <>
+                      <Notice tone="danger" title="Remove operational record?">
+                        Delete the operational reading for {fmtDate(record.date)}? History statistics will be
+                        recalculated without it. This cannot be undone.
+                      </Notice>
+                      <ActionRow>
+                        <IconAction icon="close-outline" label="Cancel" onPress={() => setPendingRemoveId(null)} />
+                        <IconAction
+                          icon="checkmark-outline"
+                          label={removingId === record._id ? 'Removing…' : 'Confirm remove'}
+                          tone="danger"
+                          disabled={removingId === record._id}
+                          onPress={() => void removeRecord(record)}
+                        />
+                      </ActionRow>
+                    </>
+                  ) : (
+                    <ActionRow>
+                      <IconAction icon="trash-outline" label="Remove" tone="danger" onPress={() => askRemove(record)} />
+                      <IconAction icon="create-outline" label="Edit" tone="primary" onPress={() => startEdit(record)} />
+                    </ActionRow>
+                  )}
                 </>
               )}
             </Card>

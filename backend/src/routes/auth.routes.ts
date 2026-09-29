@@ -98,7 +98,7 @@ router.get(
  * Role management. Replaces the client-supplied `role` field that used to be
  * accepted on /auth/register (privilege escalation). Only an admin can list or
  * change roles, so a technician cannot promote themselves. Full paths:
- * GET /api/auth/users and PUT /api/auth/users/:id/role.
+ * GET /api/auth/users, PUT /api/auth/users/:id/role and DELETE /api/auth/users/:id.
  */
 router.get(
   '/auth/users',
@@ -131,6 +131,36 @@ router.put(
     user.role = role;
     await user.save();
     res.json({ user: publicUser(user) });
+  })
+);
+
+/**
+ * Account deletion, admin only.
+ *
+ * Records are deliberately left untouched: every machine, record and case keeps
+ * the ObjectId of whoever created it, and those fields are plain ObjectIds that
+ * are never validated against the User collection, so deleting an account
+ * revokes access without rewriting history. The last remaining admin cannot be
+ * removed, which stops the deployment from locking itself out of the only
+ * surface that can manage accounts.
+ */
+router.delete(
+  '/auth/users/:id',
+  requireAuth,
+  requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    const user = await User.findById(req.params.id);
+    if (!user) throw new HttpError(404, 'Account not found.');
+
+    if (user.role === 'admin') {
+      const admins = await User.countDocuments({ role: 'admin' });
+      if (admins <= 1) {
+        throw new HttpError(409, 'This is the only admin account. Promote another admin first.');
+      }
+    }
+
+    await user.deleteOne();
+    res.json({ user: publicUser(user), deleted: true });
   })
 );
 

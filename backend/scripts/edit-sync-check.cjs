@@ -156,6 +156,38 @@ async function main() {
   token = techToken;
   const badRole = await call(`/api/auth/users/${second.payload.user.id}/role`, { method: 'PUT', body: { role: 'superuser' } });
   check('unknown role is rejected by validation', badRole.status === 422, `status=${badRole.status}`);
+
+  // ----- account deletion: admin only, last admin protected, records survive
+  token = third.payload.token; // still a technician
+  const forbiddenDelete = await call(`/api/auth/users/${adminId}`, { method: 'DELETE' });
+  check('technician cannot delete an account', forbiddenDelete.status === 403, `status=${forbiddenDelete.status}`);
+
+  token = techToken; // the second account is now the only admin left
+  const lastAdminDelete = await call(`/api/auth/users/${second.payload.user.id}`, { method: 'DELETE' });
+  check('last remaining admin cannot delete themselves', lastAdminDelete.status === 409, `status=${lastAdminDelete.status}`);
+
+  const missingUser = await call('/api/auth/users/000000000000000000000000', { method: 'DELETE' });
+  check('deleting an unknown account answers 404', missingUser.status === 404, `status=${missingUser.status}`);
+
+  const deleteOther = await call(`/api/auth/users/${adminId}`, { method: 'DELETE' });
+  check('admin can delete another account', deleteOther.status === 200 && deleteOther.payload.deleted === true, `status=${deleteOther.status}`);
+
+  const afterDelete = await call('/api/auth/users');
+  check(
+    'deleted account disappears from the list',
+    afterDelete.status === 200 && afterDelete.payload.users.every((u) => u.id !== adminId),
+    `count=${afterDelete.payload.count}`
+  );
+
+  const machineStill = await getMachine();
+  check(
+    'records created by a deleted account survive and stay attributed',
+    Boolean(machineStill && machineStill._id) && machineStill.createdBy === adminId,
+    `createdBy=${machineStill && machineStill.createdBy}`
+  );
+
+  const relogin = await call('/api/auth/login', { method: 'POST', body: { identifier: 'verifyadmin', password: 'verifypw123' } });
+  check('deleted account can no longer sign in', relogin.status === 401, `status=${relogin.status}`);
 }
 
 async function cleanup() {
