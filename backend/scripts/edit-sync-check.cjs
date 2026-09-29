@@ -172,11 +172,11 @@ async function main() {
   const deleteOther = await call(`/api/auth/users/${adminId}`, { method: 'DELETE' });
   check('admin can delete another account', deleteOther.status === 200 && deleteOther.payload.deleted === true, `status=${deleteOther.status}`);
 
-  const afterDelete = await call('/api/auth/users');
+  const teamList = await call('/api/auth/users');
   check(
     'deleted account disappears from the list',
-    afterDelete.status === 200 && afterDelete.payload.users.every((u) => u.id !== adminId),
-    `count=${afterDelete.payload.count}`
+    teamList.status === 200 && teamList.payload.users.every((u) => u.id !== adminId),
+    `count=${teamList.payload.count}`
   );
 
   const machineStill = await getMachine();
