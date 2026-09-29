@@ -1,9 +1,23 @@
 import React, { useCallback, useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Badge, Button, Card, EmptyState, Field, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Divider,
+  EmptyState,
+  Field,
+  KeyValue,
+  Notice,
+  Screen,
+  ScreenHeader,
+  SectionHeader,
+  theme
+} from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { OperationalRecord } from '../../../../lib/types';
-import { fmtDate, isValidDateInput, isValidNumberInput, toIsoOrNull, toNumberOrNull } from '../../../../lib/format';
+import { fmtDate, fmtNumber, isValidDateInput, isValidNumberInput, toIsoOrNull, toNumberOrNull } from '../../../../lib/format';
 
 export default function OperationalDataScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -74,35 +88,150 @@ export default function OperationalDataScreen() {
     }
   };
 
+  const removeRecord = (record: OperationalRecord) => {
+    Alert.alert(
+      'Remove operational record',
+      `Delete the operational reading for ${fmtDate(record.date)}? History statistics will be recalculated without it.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setError('');
+            setFeedback('');
+            try {
+              await api.del(`/api/operational-data/${record._id}`);
+              setFeedback('Operational record removed.');
+              await load();
+            } catch (err) {
+              setError(errorMessage(err));
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <Screen>
-      <Title>Operational data</Title>
-      <Subtitle>Operating hours, output, downtime and energy records.</Subtitle>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      {feedback ? <Notice tone="success">{feedback}</Notice> : null}
+      <ScreenHeader
+        title="Operational data"
+        subtitle="Operating hours, output, downtime and energy — the running context around each failure."
+        badge={records.length ? <Badge text={`${records.length} records`} tone="info" /> : undefined}
+      />
+
+      {error ? (
+        <Notice tone="danger" title="Could not save or load">
+          {error}
+        </Notice>
+      ) : null}
+      {feedback ? (
+        <Notice tone="success" title="Saved">
+          {feedback}
+        </Notice>
+      ) : null}
+
       <Card>
-        <Field label="Date (YYYY-MM-DD)" value={form.date} onChangeText={set('date')} placeholder="2025-03-10" />
-        <Field label="Operating hours" value={form.operatingHours} onChangeText={set('operatingHours')} keyboardType="numeric" />
-        <Field label="Production output" value={form.productionOutput} onChangeText={set('productionOutput')} keyboardType="numeric" />
-        <Field label="Downtime (hours)" value={form.downtime} onChangeText={set('downtime')} keyboardType="numeric" />
-        <Field label="Energy (kWh)" value={form.energy} onChangeText={set('energy')} keyboardType="numeric" />
-        <Field label="Notes" value={form.notes} onChangeText={set('notes')} />
-        <Button title={busy ? 'Saving…' : 'Save operational record'} onPress={submit} disabled={busy} />
+        <SectionHeader
+          title="Add an operational record"
+          icon="pulse-outline"
+          subtitle="One row per shift, day or reading period"
+        />
+        <Field
+          label="Date (YYYY-MM-DD)"
+          value={form.date}
+          onChangeText={set('date')}
+          placeholder="2025-03-10"
+          helper="Leave blank to use today's date."
+        />
+        <Field
+          label="Operating hours"
+          value={form.operatingHours}
+          onChangeText={set('operatingHours')}
+          keyboardType="numeric"
+          placeholder="0"
+        />
+        <Field
+          label="Production output"
+          value={form.productionOutput}
+          onChangeText={set('productionOutput')}
+          keyboardType="numeric"
+          placeholder="0"
+        />
+        <Field
+          label="Downtime (hours)"
+          value={form.downtime}
+          onChangeText={set('downtime')}
+          keyboardType="numeric"
+          placeholder="0"
+        />
+        <Field
+          label="Energy (kWh)"
+          value={form.energy}
+          onChangeText={set('energy')}
+          keyboardType="numeric"
+          placeholder="0"
+        />
+        <Field label="Notes" value={form.notes} onChangeText={set('notes')} placeholder="Optional" multiline />
+        <Button title="Save operational record" icon="checkmark-outline" loading={busy} onPress={submit} />
       </Card>
+
+      <SectionHeader
+        title="Recorded operational data"
+        icon="list-outline"
+        subtitle="Used for energy and downtime context, not for the text-based matching."
+      />
+
       {records.length === 0 ? (
-        <EmptyState title="No operational data recorded yet." />
+        <EmptyState
+          icon="pulse-outline"
+          title="No operational data yet"
+          message="Add the first operational record above to give the history statistics something to work with."
+        />
       ) : (
         records.map((record) => (
           <Card key={record._id}>
-            <Title>{fmtDate(record.date)}</Title>
-            <Muted>Operating hours: {record.operatingHours}</Muted>
-            <Muted>Production output: {record.productionOutput ?? '—'}</Muted>
-            <Muted>Downtime: {record.downtimeHours} h</Muted>
-            <Muted>Energy: {record.energyKwh ?? '—'} kWh</Muted>
-            <Badge text="operational" />
+            <View style={st.rowHead}>
+              <Text style={st.rowTitle}>{fmtDate(record.date)}</Text>
+              <Badge text="operational" tone="info" />
+            </View>
+            <KeyValue label="Operating hours" value={fmtNumber(record.operatingHours)} />
+            <KeyValue
+              label="Production output"
+              value={record.productionOutput === null ? '—' : fmtNumber(record.productionOutput)}
+            />
+            <KeyValue label="Downtime" value={`${fmtNumber(record.downtimeHours)} h`} />
+            <KeyValue
+              label="Energy"
+              value={record.energyKwh === null ? '—' : `${fmtNumber(record.energyKwh)} kWh`}
+            />
+            {record.notes ? <KeyValue label="Notes" value={record.notes} /> : null}
+            <Divider />
+            <Button
+              title="Remove record"
+              variant="ghost"
+              icon="trash-outline"
+              onPress={() => removeRecord(record)}
+            />
           </Card>
         ))
       )}
     </Screen>
   );
 }
+
+const st = StyleSheet.create({
+  rowHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: theme.space.xs
+  },
+  rowTitle: {
+    ...theme.font.cardTitle,
+    color: theme.text,
+    flex: 1,
+    marginRight: theme.space.sm
+  }
+});

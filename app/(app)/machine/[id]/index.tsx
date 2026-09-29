@@ -1,10 +1,32 @@
 import React, { useCallback, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Button, Card, KeyValue, Loading, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
+import {
+  Badge,
+  Button,
+  ButtonGroup,
+  Card,
+  Collapse,
+  Divider,
+  EmptyState,
+  KeyValue,
+  Loading,
+  Notice,
+  Screen,
+  ScreenHeader,
+  SectionHeader,
+  StatCard,
+  theme
+} from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { Machine } from '../../../../lib/types';
 import { fmtDate, fmtNumber } from '../../../../lib/format';
+
+function criticalityTone(criticality: Machine['criticality']) {
+  if (criticality === 'high') return 'danger' as const;
+  if (criticality === 'medium') return 'warning' as const;
+  return 'info' as const;
+}
 
 export default function MachineDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -52,35 +74,152 @@ export default function MachineDetailScreen() {
     ]);
   };
 
-  if (loading && !machine) return <Screen><Loading /></Screen>;
-  if (!machine) return <Screen><Notice tone="danger">{error || 'Machine not found.'}</Notice></Screen>;
+  if (loading && !machine) {
+    return (
+      <Screen>
+        <Loading label="Loading machine…" caption="Fetching the asset details and its record counts." />
+      </Screen>
+    );
+  }
+
+  if (!machine) {
+    return (
+      <Screen>
+        <EmptyState
+          icon="alert-circle-outline"
+          title="Machine unavailable"
+          message={error || 'This machine could not be found. It may have been deleted.'}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
-      <Title>{machine.machineId} · {machine.name}</Title>
-      <Subtitle>{machine.machineType}</Subtitle>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <ScreenHeader
+        title={`${machine.machineId} · ${machine.name}`}
+        subtitle={`${machine.machineType} · ${machine.location || 'Location not set'}`}
+        badge={<Badge text={machine.criticality} tone={criticalityTone(machine.criticality)} />}
+      />
+
+      {error ? (
+        <Notice tone="danger" title="Something went wrong">
+          {error}
+        </Notice>
+      ) : null}
+
+      <View style={st.statRow}>
+        <StatCard
+          label="Maintenance"
+          value={String(counts.maintenanceRecords)}
+          hint="recorded jobs"
+          icon="build-outline"
+          tone="primary"
+        />
+        <StatCard
+          label="Failures"
+          value={String(counts.failureRecords)}
+          hint="reported breakdowns"
+          icon="warning-outline"
+        />
+      </View>
+
+      <View style={st.statRow}>
+        <StatCard
+          label="Operational"
+          value={String(counts.operationalRecords)}
+          hint="sensor readings"
+          icon="pulse-outline"
+        />
+        <StatCard
+          label="Cases"
+          value={String(counts.cases)}
+          hint="analysed problems"
+          icon="clipboard-outline"
+        />
+      </View>
+
       <Card>
-        <KeyValue label="Manufacturer / model" value={[machine.manufacturer, machine.model].filter(Boolean).join(' ') || '—'} />
-        <KeyValue label="Serial number" value={machine.serialNumber || '—'} />
-        <KeyValue label="Location" value={machine.location || '—'} />
-        <KeyValue label="Criticality" value={machine.criticality} />
+        <SectionHeader title="Asset details" icon="construct-outline" />
         <KeyValue label="Operating hours" value={String(machine.operatingHours)} />
-        <KeyValue label="Rated power (kW)" value={fmtNumber(machine.ratedPowerKw)} />
-        <KeyValue label="Installed" value={fmtDate(machine.installationDate)} />
         <KeyValue label="Last maintenance" value={fmtDate(machine.lastMaintenanceDate)} />
+        <KeyValue label="Installed" value={fmtDate(machine.installationDate)} />
+        <Collapse title="Specification" subtitle="Manufacturer, serial number and rated values">
+          <KeyValue
+            label="Manufacturer / model"
+            value={[machine.manufacturer, machine.model].filter(Boolean).join(' ') || '—'}
+          />
+          <KeyValue label="Serial number" value={machine.serialNumber || '—'} />
+          <KeyValue label="Location" value={machine.location || '—'} />
+          <KeyValue label="Criticality" value={machine.criticality} />
+          <KeyValue label="Rated power (kW)" value={fmtNumber(machine.ratedPowerKw)} />
+          <KeyValue label="Rated voltage (V)" value={fmtNumber(machine.ratedVoltage)} />
+          <KeyValue label="Rated current (A)" value={fmtNumber(machine.ratedCurrent)} />
+          <KeyValue label="Design speed (rpm)" value={fmtNumber(machine.designSpeedRpm)} />
+          <KeyValue
+            label="Rated capacity"
+            value={
+              machine.ratedCapacity === null
+                ? '—'
+                : `${fmtNumber(machine.ratedCapacity)} ${machine.capacityUnit || ''}`.trim()
+            }
+          />
+          <KeyValue label="Year acquired" value={machine.yearAcquired === null ? '—' : String(machine.yearAcquired)} />
+          <KeyValue
+            label="Recommended interval"
+            value={
+              machine.recommendedMaintenanceIntervalDays === null
+                ? '—'
+                : `${machine.recommendedMaintenanceIntervalDays} days`
+            }
+          />
+          {machine.notes ? (
+            <>
+              <Divider />
+              <KeyValue label="Notes" value={machine.notes} />
+            </>
+          ) : null}
+        </Collapse>
       </Card>
-      <Card>
-        <KeyValue label="Maintenance records" value={String(counts.maintenanceRecords)} />
-        <KeyValue label="Failure records" value={String(counts.failureRecords)} />
-        <KeyValue label="Operational records" value={String(counts.operationalRecords)} />
-        <KeyValue label="Maintenance cases" value={String(counts.cases)} />
-      </Card>
-      <Button title="Maintenance history" onPress={() => router.push(`/(app)/machine/${id}/maintenance`)} />
-      <Button title="Failure records" variant="secondary" onPress={() => router.push(`/(app)/machine/${id}/failures`)} />
-      <Button title="Operational data" variant="secondary" onPress={() => router.push(`/(app)/machine/${id}/operational`)} />
-      <Button title="Start maintenance case" onPress={() => router.push({ pathname: '/(app)/case/new', params: { machine: id } })} />
-      <Button title="Delete machine" variant="danger" onPress={remove} />
+
+      <SectionHeader
+        title="History & analysis"
+        icon="search-outline"
+        subtitle="Add records so future analyses have evidence to work with."
+      />
+      <ButtonGroup>
+        <Button
+          title="Maintenance history"
+          icon="build-outline"
+          onPress={() => router.push(`/(app)/machine/${id}/maintenance`)}
+        />
+        <Button
+          title="Failure records"
+          variant="secondary"
+          icon="warning-outline"
+          onPress={() => router.push(`/(app)/machine/${id}/failures`)}
+        />
+        <Button
+          title="Operational data"
+          variant="secondary"
+          icon="pulse-outline"
+          onPress={() => router.push(`/(app)/machine/${id}/operational`)}
+        />
+        <Button
+          title="Start maintenance case"
+          icon="sparkles-outline"
+          onPress={() => router.push({ pathname: '/(app)/case/new', params: { machine: id } })}
+        />
+      </ButtonGroup>
+
+      <Button title="Delete machine" variant="danger" icon="trash-outline" onPress={remove} />
     </Screen>
   );
 }
+
+const st = StyleSheet.create({
+  statRow: {
+    flexDirection: 'row',
+    gap: theme.space.md
+  }
+});

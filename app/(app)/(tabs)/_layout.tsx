@@ -13,11 +13,15 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: '#fff' },
-        headerTitleStyle: { color: theme.text },
+        headerStyle: { backgroundColor: theme.card },
+        headerTitleStyle: { color: theme.text, fontSize: 17, fontWeight: '700' },
+        headerTintColor: theme.primary,
+        headerTitleAlign: 'left',
+        headerShadowVisible: false,
         tabBarActiveTintColor: theme.primary,
-        tabBarInactiveTintColor: theme.muted,
-        tabBarStyle: { backgroundColor: '#fff' }
+        tabBarInactiveTintColor: theme.textMuted,
+        tabBarStyle: { backgroundColor: theme.card, borderTopColor: theme.border },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' }
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Dashboard', tabBarIcon: icon('speedometer-outline') }} />

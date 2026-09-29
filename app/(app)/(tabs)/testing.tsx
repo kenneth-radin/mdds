@@ -1,7 +1,22 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { Badge, Button, Card, EmptyState, Field, Muted, Notice, Screen, Subtitle, Title } from '../../../components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Chip,
+  ChoiceGroup,
+  EmptyState,
+  Field,
+  KeyValue,
+  Muted,
+  Notice,
+  Screen,
+  ScreenHeader,
+  SectionHeader,
+  theme
+} from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
 import { Machine, TestingCase } from '../../../lib/types';
 import { fmtDateTime } from '../../../lib/format';
@@ -80,45 +95,128 @@ export default function TestingScreen() {
 
   return (
     <Screen>
-      <Title>Testing</Title>
-      <Subtitle>Compare what the system suggests with the actual maintenance solution performed.</Subtitle>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      {feedback ? <Notice tone="success">{feedback}</Notice> : null}
+      <ScreenHeader
+        title="Testing"
+        subtitle="Compare what the system suggests with the maintenance solution actually performed."
+        badge={
+          cases.length ? <Badge text={`${cases.length} logged`} tone="info" /> : undefined
+        }
+      />
+
+      {error ? (
+        <Notice tone="danger" title="Could not save or load">
+          {error}
+        </Notice>
+      ) : null}
+      {feedback ? (
+        <Notice tone="success" title="Saved">
+          {feedback}
+        </Notice>
+      ) : null}
 
       {machines.length === 0 ? (
-        <EmptyState title="No machines registered yet." message="Register a machine before recording testing cases." />
+        <EmptyState
+          icon="construct-outline"
+          title="No machines registered yet"
+          message="Register a machine before recording testing cases."
+        />
       ) : (
         <Card>
-          <Muted>Machine</Muted>
-          {machines.map((machine) => (
-            <Pressable key={machine._id} onPress={() => setSelected(machine)}>
-              <Card style={{ borderColor: selected?._id === machine._id ? '#4f46e5' : undefined }}>
-                <Title>{machine.machineId} · {machine.name}</Title>
-                <Muted>{machine.machineType}</Muted>
-              </Card>
-            </Pressable>
-          ))}
-          <Field label="Test case description" value={description} onChangeText={setDescription} placeholder="Case 1 - bearing noise on dough mixer" />
-          <Field label="Expected maintenance solution" value={expected} onChangeText={setExpected} placeholder="Replace bearing and realign coupling" />
-          <Field label="Actual maintenance solution" value={actual} onChangeText={setActual} placeholder="Record the actual action performed" />
-          <Field label="Notes (optional)" value={notes} onChangeText={setNotes} placeholder="Researcher observations" />
-          <Button title={busy ? 'Saving…' : 'Save testing case'} onPress={submit} disabled={busy} />
+          <SectionHeader
+            title="New testing case"
+            icon="flask-outline"
+            subtitle="Record your expectation, then what the workshop actually did."
+          />
+
+          <ChoiceGroup
+            label="Machine"
+            value={selected?._id ?? ''}
+            options={machines.map((machine) => ({
+              value: machine._id,
+              label: `${machine.machineId} · ${machine.name}`,
+              hint: machine.machineType
+            }))}
+            onChange={(id) => setSelected(machines.find((machine) => machine._id === id) ?? null)}
+          />
+
+          <Field
+            label="Test case description"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Case 1 – bearing noise on dough mixer"
+            required
+            multiline
+          />
+          <Field
+            label="Expected maintenance solution"
+            value={expected}
+            onChangeText={setExpected}
+            placeholder="Replace bearing and realign coupling"
+            helper="What you expected the system to recommend."
+            required
+            multiline
+          />
+          <Field
+            label="Actual maintenance solution"
+            value={actual}
+            onChangeText={setActual}
+            placeholder="Record the actual action performed"
+            required
+            multiline
+          />
+          <Field
+            label="Notes (optional)"
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Researcher observations"
+            multiline
+          />
+
+          <Button
+            title="Save testing case"
+            icon="checkmark-outline"
+            loading={busy}
+            onPress={submit}
+          />
         </Card>
       )}
 
+      <SectionHeader
+        title="Recorded testing cases"
+        icon="list-outline"
+        subtitle="Each card shows how closely the suggestion matched what was done."
+      />
+
       {cases.length === 0 ? (
-        <EmptyState title="No testing cases recorded yet." />
+        <EmptyState
+          icon="flask-outline"
+          title="No testing cases recorded yet"
+          message="Save your first case above to start comparing suggestions with reality."
+        />
       ) : (
         cases.map((item) => {
           const machine = typeof item.machine === 'string' ? null : item.machine;
           return (
             <Card key={item._id}>
-              <Title>{item.description}</Title>
-              <Muted>{machine ? `${machine.machineId} · ${machine.name}` : 'Machine'}</Muted>
-              <Muted>Expected: {item.expectedSuggestion}</Muted>
-              <Muted>Actual: {item.actualSuggestion}</Muted>
-              <Muted>Recorded: {fmtDateTime(item.createdAt)}</Muted>
-              <Badge text={item.matched ? `Match: ${item.matchScore ?? 0}%` : `No match (${item.matchScore ?? 0}%)`} tone={item.matched ? 'success' : 'warning'} />
+              <View style={st.rowHead}>
+                <Text style={st.rowTitle}>{item.description}</Text>
+                <Badge
+                  text={
+                    item.matched
+                      ? `match ${item.matchScore ?? 0}%`
+                      : `no match (${item.matchScore ?? 0}%)`
+                  }
+                  tone={item.matched ? 'success' : 'warning'}
+                />
+              </View>
+              <Muted>
+                {machine ? `${machine.machineId} · ${machine.name}` : 'Machine'}
+              </Muted>
+              <KeyValue label="Expected suggestion" value={item.expectedSuggestion} />
+              <KeyValue label="Actual suggestion" value={item.actualSuggestion} />
+              <View style={st.chipRow}>
+                <Chip label={fmtDateTime(item.createdAt)} icon="calendar-outline" />
+              </View>
             </Card>
           );
         })
@@ -126,3 +224,24 @@ export default function TestingScreen() {
     </Screen>
   );
 }
+
+const st = StyleSheet.create({
+  rowHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: theme.space.xs
+  },
+  rowTitle: {
+    ...theme.font.cardTitle,
+    color: theme.text,
+    flex: 1,
+    marginRight: theme.space.sm
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space.sm,
+    marginTop: theme.space.sm
+  }
+});

@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
-import { Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button, Card, Field, Muted, Notice, Screen, Subtitle, Title } from '../../../components/ui';
+import {
+  Button,
+  Card,
+  ChoiceGroup,
+  Field,
+  Notice,
+  Screen,
+  ScreenHeader,
+  SectionHeader
+} from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
 import { isValidDateInput, isValidNumberInput, toIsoOrNull, toNumberOrNull } from '../../../lib/format';
 
@@ -78,29 +86,115 @@ export default function NewMachineScreen() {
 
   return (
     <Screen>
-      <Title>Add Machine</Title>
-      <Subtitle>Register a real machine profile. Only entered values are stored.</Subtitle>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <ScreenHeader
+        title="Add a machine"
+        subtitle="Register a real machine profile. Only the values you enter are stored."
+      />
+
+      {error ? (
+        <Notice tone="danger" title="Could not save the machine">
+          {error}
+        </Notice>
+      ) : null}
+
       <Card>
-        <Field label="Machine ID *" value={form.machineId} onChangeText={set('machineId')} placeholder="MX-001" />
-        <Field label="Machine name *" value={form.name} onChangeText={set('name')} placeholder="Dough Mixer" />
-        <Field label="Machine type *" value={form.machineType} onChangeText={set('machineType')} placeholder="Mixer / Pump / Conveyor" />
-        <Field label="Manufacturer" value={form.manufacturer} onChangeText={set('manufacturer')} />
-        <Field label="Model" value={form.model} onChangeText={set('model')} />
-        <Field label="Serial number" value={form.serialNumber} onChangeText={set('serialNumber')} />
-        <Field label="Location" value={form.location} onChangeText={set('location')} placeholder="Production line 1" />
-        <Field label="Installation date (YYYY-MM-DD)" value={form.installationDate} onChangeText={set('installationDate')} placeholder="2024-01-15" />
-        <Field label="Operating hours" value={form.operatingHours} onChangeText={set('operatingHours')} keyboardType="numeric" placeholder="0" />
-        <Field label="Rated power (kW)" value={form.ratedPowerKw} onChangeText={set('ratedPowerKw')} keyboardType="numeric" placeholder="Optional" />
-        <Field label="Notes" value={form.notes} onChangeText={set('notes')} placeholder="Optional" />
+        <SectionHeader
+          title="Identity"
+          icon="construct-outline"
+          subtitle="How this asset is identified on the shop floor"
+        />
+        <Field
+          label="Machine ID"
+          value={form.machineId}
+          onChangeText={set('machineId')}
+          placeholder="MX-001"
+          required
+        />
+        <Field
+          label="Machine name"
+          value={form.name}
+          onChangeText={set('name')}
+          placeholder="Dough Mixer"
+          required
+        />
+        <Field
+          label="Machine type"
+          value={form.machineType}
+          onChangeText={set('machineType')}
+          placeholder="Mixer / Pump / Conveyor"
+          required
+        />
+        <Field
+          label="Manufacturer"
+          value={form.manufacturer}
+          onChangeText={set('manufacturer')}
+          placeholder="Optional"
+        />
+        <Field label="Model" value={form.model} onChangeText={set('model')} placeholder="Optional" />
+        <Field
+          label="Serial number"
+          value={form.serialNumber}
+          onChangeText={set('serialNumber')}
+          placeholder="Optional"
+        />
+        <Field
+          label="Location"
+          value={form.location}
+          onChangeText={set('location')}
+          placeholder="Production line 1"
+        />
       </Card>
+
       <Card>
-        <Muted>Criticality</Muted>
-        <Pressable onPress={() => setCriticality('low')}><Title>{criticality === 'low' ? '◉' : '○'} Low</Title></Pressable>
-        <Pressable onPress={() => setCriticality('medium')}><Title>{criticality === 'medium' ? '◉' : '○'} Medium</Title></Pressable>
-        <Pressable onPress={() => setCriticality('high')}><Title>{criticality === 'high' ? '◉' : '○'} High</Title></Pressable>
+        <SectionHeader
+          title="Service and ratings"
+          icon="speedometer-outline"
+          subtitle="Optional figures used by the dashboards"
+        />
+        <Field
+          label="Installation date (YYYY-MM-DD)"
+          value={form.installationDate}
+          onChangeText={set('installationDate')}
+          placeholder="2024-01-15"
+          helper="Leave blank if the date is unknown."
+        />
+        <Field
+          label="Operating hours"
+          value={form.operatingHours}
+          onChangeText={set('operatingHours')}
+          keyboardType="numeric"
+          placeholder="0"
+        />
+        <Field
+          label="Rated power (kW)"
+          value={form.ratedPowerKw}
+          onChangeText={set('ratedPowerKw')}
+          keyboardType="numeric"
+          placeholder="Optional"
+        />
+        <Field
+          label="Notes"
+          value={form.notes}
+          onChangeText={set('notes')}
+          placeholder="Optional"
+          multiline
+        />
       </Card>
-      <Button title={busy ? 'Saving…' : 'Save machine'} onPress={submit} disabled={busy} />
+
+      <Card tone="muted">
+        <ChoiceGroup
+          label="Criticality"
+          value={criticality}
+          options={[
+            { value: 'low', label: 'Low', hint: 'Failure only slows a non-critical step' },
+            { value: 'medium', label: 'Medium', hint: 'Failure reduces throughput' },
+            { value: 'high', label: 'High', hint: 'Failure stops the line' }
+          ]}
+          onChange={(value) => setCriticality(value)}
+        />
+      </Card>
+
+      <Button title="Save machine" icon="checkmark-outline" loading={busy} onPress={submit} />
     </Screen>
   );
 }

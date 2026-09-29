@@ -1,7 +1,17 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Button, Card, Field, Loading, Muted, Notice, Screen, Subtitle, Title } from '../../../../components/ui';
+import {
+  Button,
+  Card,
+  ChoiceGroup,
+  Field,
+  Loading,
+  Muted,
+  Notice,
+  Screen,
+  ScreenHeader,
+  SectionHeader
+} from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
 import { MaintenanceCase } from '../../../../lib/types';
 import { isValidNumberInput, splitCsv, toNumberOrNull, humanize } from '../../../../lib/format';
@@ -80,46 +90,93 @@ export default function CaseOutcomeScreen() {
     }
   };
 
-  if (!item) return <Screen><Loading /></Screen>;
+  if (!item) {
+    return (
+      <Screen>
+        <Loading label="Loading the case…" caption="Fetching the case so the outcome can be recorded against it." />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
-      <Title>Record actual maintenance</Title>
-      <Subtitle>{item.caseNumber} · completing this case makes it available as historical data for future analyses.</Subtitle>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <ScreenHeader
+        title="Record actual maintenance"
+        subtitle={`${item.caseNumber} · completing this case makes it available as historical evidence for future analyses.`}
+      />
+
+      {error ? (
+        <Notice tone="danger" title="Could not save the outcome">
+          {error}
+        </Notice>
+      ) : null}
+
       <Card>
-        <Muted>Outcome</Muted>
-        <View style={{ marginVertical: 6, gap: 8 }}>
-          {results.map((value) => (
-            <Pressable
-              key={value}
-              onPress={() => setResult(value)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: 6,
-                paddingHorizontal: 8,
-                borderRadius: 8,
-                backgroundColor: result === value ? '#f1f5f9' : 'transparent'
-              }}
-            >
-              <Text style={{ fontSize: 16, marginRight: 8, color: result === value ? '#4f46e5' : '#64748b' }}>
-                {result === value ? '◉' : '○'}
-              </Text>
-              <Text style={{ fontSize: 14, fontWeight: result === value ? '700' : '500', color: '#1e293b' }}>
-                {humanize(value)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <Field label="Actual maintenance action taken *" value={form.actionTaken} onChangeText={set('actionTaken')} placeholder="What was actually done" />
-        <Field label="Parts replaced (comma separated)" value={form.parts} onChangeText={set('parts')} />
-        <Field label="Downtime (hours)" value={form.downtime} onChangeText={set('downtime')} keyboardType="numeric" />
-        <Field label="Technician" value={form.technician} onChangeText={set('technician')} />
-        <Field label="Cost" value={form.cost} onChangeText={set('cost')} keyboardType="numeric" />
-        <Field label="Production loss (units)" value={form.loss} onChangeText={set('loss')} keyboardType="numeric" />
-        <Field label="Notes" value={form.notes} onChangeText={set('notes')} />
-        <Button title={busy ? 'Saving…' : 'Save outcome and complete case'} onPress={submit} disabled={busy} />
+        <SectionHeader
+          title="What was done"
+          icon="build-outline"
+          subtitle="These values become the machine's history the analyser reads next time."
+        />
+
+        <ChoiceGroup
+          label="Outcome"
+          value={result}
+          options={results.map((value) => ({
+            value,
+            label: humanize(value),
+            hint:
+              value === 'resolved'
+                ? 'Machine is back to full service'
+                : value === 'partially-resolved'
+                ? 'Improved, but follow-up may be needed'
+                : 'Problem persists after the work'
+          }))}
+          onChange={(value) => setResult(value)}
+        />
+
+        <Field
+          label="Actual maintenance action taken"
+          value={form.actionTaken}
+          onChangeText={set('actionTaken')}
+          placeholder="What was actually done"
+          helper="Pre-filled with the reviewed suggestion when one exists — edit it to match reality."
+          required
+          multiline
+        />
+        <Field
+          label="Parts replaced (comma separated)"
+          value={form.parts}
+          onChangeText={set('parts')}
+          placeholder="bearing, coupling"
+        />
+        <Field
+          label="Downtime (hours)"
+          value={form.downtime}
+          onChangeText={set('downtime')}
+          keyboardType="numeric"
+          placeholder="4.5"
+        />
+        <Field label="Technician" value={form.technician} onChangeText={set('technician')} placeholder="Who performed the work" />
+        <Field label="Cost" value={form.cost} onChangeText={set('cost')} keyboardType="numeric" placeholder="0" />
+        <Field
+          label="Production loss (units)"
+          value={form.loss}
+          onChangeText={set('loss')}
+          keyboardType="numeric"
+          placeholder="0"
+        />
+        <Field label="Notes" value={form.notes} onChangeText={set('notes')} placeholder="Anything worth remembering" multiline />
+
+        <Muted>
+          Saving marks the case as completed, so it can be matched against future problems reported on this machine.
+        </Muted>
+
+        <Button
+          title="Save outcome and complete case"
+          icon="checkmark-done-outline"
+          loading={busy}
+          onPress={submit}
+        />
       </Card>
     </Screen>
   );

@@ -1,7 +1,17 @@
 import React from 'react';
 import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button, Card, KeyValue, Muted, Notice, Screen, Subtitle, Title } from '../../../components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  KeyValue,
+  Muted,
+  Notice,
+  Screen,
+  ScreenHeader,
+  SectionHeader
+} from '../../../components/ui';
 import { useAuth } from '../../../lib/auth';
 import { API_URL } from '../../../lib/config';
 import { fmtDateTime } from '../../../lib/format';
@@ -19,31 +29,58 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
-      <Title>Settings</Title>
-      <Subtitle>Session and backend configuration.</Subtitle>
+      <ScreenHeader
+        title="Settings"
+        subtitle="Session, backend connection and model access."
+        badge={user ? <Badge text={user.role} tone="info" /> : undefined}
+      />
+
       <Card>
+        <SectionHeader
+          title="Signed-in user"
+          icon="person-outline"
+          subtitle="Read from the session stored on this device"
+        />
         <KeyValue label="Name" value={user?.name || '—'} />
         <KeyValue label="Username" value={user?.username || '—'} />
         <KeyValue label="Email" value={user?.email || '—'} />
         <KeyValue label="Role" value={user?.role || '—'} />
         <KeyValue label="Title" value={user?.title || '—'} />
       </Card>
+
       <Card>
+        <SectionHeader
+          title="Backend"
+          icon="server-outline"
+          subtitle="Where this app sends its requests"
+        />
         <KeyValue label="API base URL" value={API_URL} />
         <KeyValue label="Current time" value={fmtDateTime(new Date().toISOString())} />
-        <Notice>
-          To reach the backend from a physical phone, EXPO_PUBLIC_API_URL must point to your computer LAN IP (same Wi-Fi) or a backend tunnel. Do not put database or JWT secrets in this app.
+        <Notice tone="info" title="Reaching the backend from a phone">
+          EXPO_PUBLIC_API_URL must point to your computer's LAN IP (same Wi-Fi) or a backend tunnel. Never put database
+          or JWT secrets in this app.
         </Notice>
       </Card>
+
       <Card>
-        <KeyValue label="Machine learning" value="Layer 3 benchmark models" />
+        <SectionHeader
+          title="Machine learning"
+          icon="hardware-chip-outline"
+          subtitle="Layer 3 benchmark models"
+        />
         <Muted>
           Model cards with dataset, licence, per-class metrics, confusion matrices and stated limitations, plus a form
           that scores entered operating parameters with the trained classifiers.
         </Muted>
-        <Button title="Open ML models" variant="secondary" onPress={() => router.push('/(app)/(tabs)/models')} />
+        <Button
+          title="Open AI predictions"
+          variant="secondary"
+          icon="sparkles-outline"
+          onPress={() => router.push('/(app)/(tabs)/models')}
+        />
       </Card>
-      <Button title="Sign out" variant="danger" onPress={confirmSignOut} />
+
+      <Button title="Sign out" variant="danger" icon="log-out-outline" onPress={confirmSignOut} />
     </Screen>
   );
 }

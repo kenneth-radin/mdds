@@ -1,11 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import {
   Badge,
   Button,
   Card,
-  Divider,
+  Chip,
+  ChoiceGroup,
+  Collapse,
   EmptyState,
   Field,
   KeyValue,
@@ -13,8 +15,9 @@ import {
   Muted,
   Notice,
   Screen,
-  Subtitle,
-  Title,
+  ScreenHeader,
+  SectionHeader,
+  StatCard,
   theme
 } from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
@@ -82,93 +85,148 @@ function toForm(values: MlOperatingParameters): NumericForm {
 }
 
 function MlModelCardView({ card }: { card: MlModelCard }) {
-  const [open, setOpen] = useState(false);
   const trained = card.status === 'trained';
   const evaluation = card.evaluation;
   const belowBaseline = evaluation ? evaluation.accuracy < evaluation.majorityClassBaseline : false;
 
   return (
-    <Card>
-      <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button">
-        <View style={st.cardHead}>
+    <Card tone={trained ? 'default' : 'muted'}>
+      <View style={st.cardHead}>
+        <View style={st.cardHeadText}>
           <Text style={st.cardName}>{card.name}</Text>
-          <Badge text={trained ? 'trained' : 'unavailable'} tone={trained ? 'success' : 'warning'} />
+          <Muted>
+            {card.kind} · {card.task} · layer {card.layer}
+          </Muted>
         </View>
-        <Muted>{card.description}</Muted>
-        <Muted>{open ? 'Tap to hide the model card ▾' : 'Tap to show the full model card ▸'}</Muted>
-      </Pressable>
+        <Badge text={trained ? 'trained' : 'unavailable'} tone={trained ? 'success' : 'warning'} />
+      </View>
 
-      {!trained ? <Muted>{card.reason ?? 'Model weights are not loaded.'}</Muted> : null}
+      <Muted>{card.description}</Muted>
+
+      {!trained ? (
+        <View style={{ marginTop: theme.space.md }}>
+          <Notice tone="warning" title="Weights are not loaded">
+            {card.reason ?? 'Model weights are not loaded.'}
+          </Notice>
+        </View>
+      ) : null}
 
       {trained && evaluation ? (
         <>
-          <Divider />
-          <KeyValue label="Accuracy" value={pct(evaluation.accuracy)} />
-          <KeyValue label="Majority-class baseline" value={pct(evaluation.majorityClassBaseline)} />
-          <KeyValue label="Accuracy vs baseline" value={points(evaluation.accuracy - evaluation.majorityClassBaseline)} />
-          <KeyValue label="Macro-F1" value={pct(evaluation.macroF1)} />
-          <KeyValue label="Weighted-F1" value={pct(evaluation.weightedF1)} />
-          <KeyValue label="Evaluated on" value={`${evaluation.samples} rows`} />
+          <View style={st.statRow}>
+            <StatCard
+              label="Accuracy"
+              value={pct(evaluation.accuracy)}
+              hint="all held-out rows"
+              icon="trophy-outline"
+            />
+            <StatCard
+              label="Macro F1"
+              value={pct(evaluation.macroF1)}
+              hint="every class weighted equally"
+              icon="stats-chart-outline"
+            />
+            <StatCard
+              label="Rows evaluated"
+              value={String(evaluation.samples)}
+              hint="measured, not estimated"
+              icon="albums-outline"
+            />
+          </View>
+
+          <View style={st.chipRow}>
+            <Chip
+              label={`Accuracy vs baseline ${points(
+                evaluation.accuracy - evaluation.majorityClassBaseline
+              )}`}
+              icon="git-compare-outline"
+              tone="primary"
+            />
+          </View>
+
           {belowBaseline ? (
-            <Notice tone="warning">
-              Accuracy is below the majority-class baseline on purpose. Balanced class weighting trades specificity for
-              recall, because a model that always answered &quot;no failure&quot; would score {pct(evaluation.majorityClassBaseline)}{' '}
-              while catching nothing. Read precision, recall and the confusion matrix below.
-            </Notice>
+            <View style={{ marginTop: theme.space.md }}>
+              <Notice tone="warning" title="Below the baseline on purpose">
+                Accuracy sits below the majority-class baseline by design. Balanced class weighting trades specificity
+                for recall, because a model that always answered “no failure” would score{' '}
+                {pct(evaluation.majorityClassBaseline)} while catching nothing. Read precision, recall and the
+                confusion matrix below.
+              </Notice>
+            </View>
           ) : null}
         </>
       ) : null}
 
-      {open ? <MlModelCardDetails card={card} /> : null}
+      <Collapse
+        title="Dataset, training and per-class metrics"
+        subtitle="Provenance, cross-validated scores, confusion matrix and stated limitations"
+        badge={<Chip label={`${card.limitations.length} limitations`} icon="alert-outline" />}
+      >
+        <MlModelCardDetails card={card} />
+      </Collapse>
     </Card>
   );
 }
 
-/** Everything below the fold: provenance, training, per-class metrics, limitations. */
+/** Everything below the fold: provenance, dataset, features, training, per-class metrics, limitations. */
 function MlModelCardDetails({ card }: { card: MlModelCard }) {
   const evaluation = card.evaluation;
 
   return (
     <>
-      <Divider />
-      <Muted>Identity</Muted>
+      <SectionHeader title="Provenance" icon="server-outline" />
+      <KeyValue label="Model id" value={card.id} />
       <KeyValue label="Kind" value={card.kind} />
       <KeyValue label="Task" value={card.task} />
       <KeyValue label="Layer" value={String(card.layer)} />
-      <KeyValue label="Model id" value={card.id} />
       <KeyValue label="Trained at" value={fmtDateTime(card.trainedAt)} />
 
-      <Divider />
-      <Muted>Dataset</Muted>
+      <SectionHeader title="Dataset" icon="cube-outline" />
       {card.dataset ? (
         <>
           <KeyValue label="Name" value={card.dataset.name} />
           <KeyValue label="Source" value={card.dataset.source} />
           <KeyValue label="Licence" value={card.dataset.license} />
-          <KeyValue label="Synthetic" value={card.dataset.synthetic ? 'Yes — not measured here' : 'No'} />
+          <KeyValue
+            label="Synthetic"
+            value={card.dataset.synthetic ? 'Yes — not measured here' : 'No'}
+          />
           <KeyValue label="Rows" value={String(card.dataset.samples)} />
-          {Object.entries(card.dataset.classBalance).map(([label, count]) => (
-            <KeyValue key={label} label={`Class ${label}`} value={String(count)} />
-          ))}
-          <Muted>{card.dataset.note}</Muted>
-          <Muted>Citation: {card.dataset.citation}</Muted>
+          <View style={st.chipRow}>
+            {Object.entries(card.dataset.classBalance).map(([label, count]) => (
+              <Chip key={label} label={`Class ${label}: ${count}`} icon="pricetag-outline" />
+            ))}
+          </View>
+          <View style={{ marginTop: theme.space.sm }}>
+            <Muted>{card.dataset.note}</Muted>
+            <Muted>Citation: {card.dataset.citation}</Muted>
+          </View>
         </>
       ) : (
         <Muted>No dataset information supplied for this model.</Muted>
       )}
 
-      <Divider />
-      <Muted>Input features</Muted>
-      <Muted>{card.features.join(', ')}</Muted>
+      <SectionHeader title="Input features" icon="list-outline" />
+      <View style={st.chipRow}>
+        {card.features.map((feature) => (
+          <Chip key={feature} label={feature} />
+        ))}
+      </View>
 
       {card.training ? (
         <>
-          <Divider />
-          <Muted>Training</Muted>
+          <SectionHeader
+            title="Training run"
+            icon="flask-outline"
+            subtitle="Gradient descent on balanced class weights"
+          />
           <KeyValue label="Rows used" value={String(card.training.samples)} />
           <KeyValue label="Features" value={String(card.training.features)} />
           <KeyValue label="Classes" value={String(card.training.classes)} />
-          <KeyValue label="Epochs run" value={`${card.training.stoppedAtEpoch} of ${card.training.epochs}`} />
+          <KeyValue
+            label="Epochs run"
+            value={`${card.training.stoppedAtEpoch} of ${card.training.epochs}`}
+          />
           <KeyValue label="Learning rate" value={String(card.training.learningRate)} />
           <KeyValue label="L2 penalty" value={String(card.training.l2)} />
         </>
@@ -176,8 +234,7 @@ function MlModelCardDetails({ card }: { card: MlModelCard }) {
 
       {evaluation ? <MlModelEvaluation evaluation={evaluation} /> : null}
 
-      <Divider />
-      <Muted>Known limitations</Muted>
+      <SectionHeader title="Known limitations" icon="alert-outline" />
       {card.limitations.map((limitation) => (
         <Text key={limitation} style={st.bullet}>
           • {limitation}
@@ -192,26 +249,47 @@ type Evaluation = NonNullable<MlModelCard['evaluation']>;
 function MlModelEvaluation({ evaluation }: { evaluation: Evaluation }) {
   return (
     <>
-      <Divider />
-      <Muted>Evaluation — {evaluation.method}</Muted>
-      <KeyValue label="Folds" value={String(evaluation.folds)} />
-      <KeyValue label="Random seed" value={String(evaluation.seed)} />
-      <KeyValue label="Most common label" value={evaluation.majorityClassLabel} />
+      <SectionHeader
+        title="Evaluation"
+        icon="speedometer-outline"
+        subtitle={`${evaluation.method} · ${evaluation.folds} folds · seed ${evaluation.seed}`}
+      />
+      <View style={st.chipRow}>
+        <Chip
+          label={`most common label: ${evaluation.majorityClassLabel}`}
+          icon="pricetag-outline"
+          tone="primary"
+        />
+      </View>
+
+      <View style={{ marginTop: theme.space.xs }}>
+        <KeyValue label="Majority-class baseline" value={pct(evaluation.majorityClassBaseline)} />
+        <KeyValue label="Weighted-F1" value={pct(evaluation.weightedF1)} />
+      </View>
+
       {evaluation.perClass.map((row) => (
         <View key={row.label} style={st.classBlock}>
-          <Text style={st.classTitle}>Class {row.label}</Text>
-          <KeyValue label="Support" value={String(row.support)} />
-          <KeyValue label="Precision" value={pct(row.precision)} />
-          <KeyValue label="Recall" value={pct(row.recall)} />
-          <KeyValue label="F1" value={pct(row.f1)} />
-          <KeyValue label="True / false positives" value={`${row.truePositives} / ${row.falsePositives}`} />
+          <View style={st.cardHead}>
+            <Text style={st.classTitle}>Class {row.label}</Text>
+            <Badge text={`${row.support} rows`} tone="info" size="sm" />
+          </View>
+          <View style={st.statRow}>
+            <StatCard label="Precision" value={pct(row.precision)} hint="how often it was right" />
+            <StatCard label="Recall" value={pct(row.recall)} hint="how much it found" />
+            <StatCard label="F1" value={pct(row.f1)} hint="balance of both" />
+          </View>
+          <KeyValue
+            label="True / false positives"
+            value={`${row.truePositives} / ${row.falsePositives}`}
+          />
           <KeyValue label="False negatives" value={String(row.falseNegatives)} />
         </View>
       ))}
-      <Muted>Confusion matrix — rows = actual, columns = predicted (labels {evaluation.labels.join(', ')})</Muted>
+
+      <SectionHeader title="Confusion matrix" icon="grid-outline" subtitle="Rows = actual, columns = predicted" />
       <View style={st.matrix}>
         <View style={st.matrixRow}>
-          <Text style={[st.matrixCell, st.matrixHead]} />
+          <Text style={[st.matrixCell, st.matrixLabel]} />
           {evaluation.labels.map((label) => (
             <Text key={label} style={[st.matrixCell, st.matrixHead]}>
               pred {label}
@@ -286,16 +364,22 @@ function PredictPanel({ decisionThreshold }: { decisionThreshold: number }) {
   };
 
   return (
-    <Card>
-      <Text style={st.cardName}>Run the benchmark models</Text>
-      <Muted>
-        Enter operating parameters to score them with the trained classifiers. This writes nothing to the database.
-      </Muted>
+    <Card tone="hero">
+      <SectionHeader
+        title="Try the benchmark models"
+        icon="flask-outline"
+        subtitle="Score operating parameters with the trained classifiers. Nothing is written to the database."
+      />
 
       <View style={st.presetRow}>
         {PRESETS.map((preset) => (
           <View key={preset.label} style={st.presetItem}>
-            <Button title={preset.label} variant="secondary" onPress={() => applyPreset(preset.values)} />
+            <Button
+              title={preset.label}
+              variant="secondary"
+              icon="flash-outline"
+              onPress={() => applyPreset(preset.values)}
+            />
           </View>
         ))}
       </View>
@@ -311,23 +395,31 @@ function PredictPanel({ decisionThreshold }: { decisionThreshold: number }) {
         />
       ))}
 
-      <Muted>Product type</Muted>
-      <View style={st.presetRow}>
-        {PRODUCT_TYPES.map((type) => (
-          <Pressable
-            key={type}
-            style={st.presetItem}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: productType === type }}
-            onPress={() => setProductType(type)}
-          >
-            <Text style={st.radio}>{productType === type ? `◉ ${type}` : `○ ${type}`}</Text>
-          </Pressable>
-        ))}
-      </View>
+      <ChoiceGroup
+        label="Product type"
+        value={productType}
+        options={PRODUCT_TYPES.map((type) => ({
+          value: type,
+          label: `Variant ${type}`,
+          hint: `Benchmark quality variant ${type}`
+        }))}
+        onChange={(value) => setProductType(value)}
+      />
 
-      <Button title={busy ? 'Running…' : 'Run prediction'} onPress={run} disabled={busy} />
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <Button
+        title="Run prediction"
+        icon="play-outline"
+        loading={busy}
+        onPress={run}
+      />
+
+      {error ? (
+        <View style={{ marginTop: theme.space.md }}>
+          <Notice tone="danger" title="Prediction could not run">
+            {error}
+          </Notice>
+        </View>
+      ) : null}
 
       {result ? <PredictResults result={result} decisionThreshold={decisionThreshold} /> : null}
     </Card>
@@ -335,14 +427,30 @@ function PredictPanel({ decisionThreshold }: { decisionThreshold: number }) {
 }
 
 function PredictResults({ result, decisionThreshold }: { result: MlPredictResponse; decisionThreshold: number }) {
+  const flagged = result.results.filter((entry) => entry.flagged).length;
+
   return (
     <>
-      <Divider />
-      <Muted>{result.analysisMethod}</Muted>
-      <Muted>Flagged when the probability reaches {pct(decisionThreshold)}.</Muted>
+      <SectionHeader
+        title="Prediction results"
+        icon="analytics-outline"
+        subtitle={`${result.analysisMethod} · flagged when the probability reaches ${pct(decisionThreshold)}`}
+      />
+
+      <View style={st.statRow}>
+        <StatCard label="Models run" value={String(result.results.length)} icon="hardware-chip-outline" />
+        <StatCard
+          label="Flagged"
+          value={String(flagged)}
+          hint="above the decision threshold"
+          icon="warning-outline"
+          tone={flagged ? 'warning' : 'default'}
+        />
+        <StatCard label="Threshold" value={pct(decisionThreshold)} icon="options-outline" />
+      </View>
 
       {result.results.map((entry) => (
-        <View key={entry.modelId} style={st.resultBlock}>
+        <Card key={entry.modelId} tone="muted" style={{ marginTop: theme.space.md }}>
           <View style={st.cardHead}>
             <Text style={st.classTitle}>{entry.name}</Text>
             {entry.status === 'trained' ? (
@@ -353,36 +461,60 @@ function PredictResults({ result, decisionThreshold }: { result: MlPredictRespon
           </View>
           {entry.status === 'trained' && entry.probability !== undefined ? (
             <>
-              <KeyValue label="Probability of class 1" value={pct(entry.probability)} />
-              <KeyValue label="Threshold applied" value={pct(entry.decisionThreshold ?? decisionThreshold)} />
+              <View style={st.statRow}>
+                <StatCard
+                  label="Failure probability"
+                  value={pct(entry.probability)}
+                  hint={
+                    entry.flagged
+                      ? 'at or above the decision threshold'
+                      : 'below the decision threshold'
+                  }
+                  tone={entry.flagged ? 'warning' : 'default'}
+                />
+                <StatCard
+                  label="Threshold applied"
+                  value={pct(entry.decisionThreshold ?? decisionThreshold)}
+                  hint="probability that flags failure"
+                />
+              </View>
               {entry.evaluation ? (
-                <Muted>
-                  Measured by {entry.evaluation.method}: accuracy {pct(entry.evaluation.accuracy)} against a{' '}
-                  {pct(entry.evaluation.majorityClassBaseline)} baseline, macro-F1{' '}
-                  {pct(entry.evaluation.macroF1)}.
-                </Muted>
+                <View style={{ marginTop: theme.space.sm }}>
+                  <Muted>
+                    Measured by {entry.evaluation.method}: accuracy {pct(entry.evaluation.accuracy)} against a{' '}
+                    {pct(entry.evaluation.majorityClassBaseline)} baseline, macro-F1{' '}
+                    {pct(entry.evaluation.macroF1)}.
+                  </Muted>
+                </View>
               ) : null}
             </>
           ) : (
             <Muted>{entry.reason ?? 'Model weights are not loaded.'}</Muted>
           )}
-        </View>
+        </Card>
       ))}
 
-      <Divider />
-      <Muted>Derived feature vector sent to the models</Muted>
-      {result.features.map((feature) => (
-        <KeyValue key={feature.name} label={feature.name} value={fmtNumber(feature.value, 4)} />
-      ))}
+      <Collapse
+        title="Feature vector sent to the models"
+        subtitle={`${result.features.length} derived values, scaled exactly as during training`}
+      >
+        {result.features.map((feature) => (
+          <KeyValue key={feature.name} label={feature.name} value={fmtNumber(feature.value, 4)} />
+        ))}
+      </Collapse>
 
-      <Divider />
-      <Muted>Known limitations</Muted>
-      {result.limitations.map((limitation) => (
-        <Text key={limitation} style={st.bullet}>
-          • {limitation}
-        </Text>
-      ))}
-      <Muted>{result.note}</Muted>
+      <Collapse
+        title="Known limitations"
+        subtitle={`${result.limitations.length} caveats to keep in mind before acting`}
+        badge={<Chip label="read before deciding" icon="alert-outline" />}
+      >
+        {result.limitations.map((limitation) => (
+          <Text key={limitation} style={st.bullet}>
+            • {limitation}
+          </Text>
+        ))}
+        <Muted>{result.note}</Muted>
+      </Collapse>
     </>
   );
 }
@@ -413,27 +545,65 @@ export default function ModelsScreen() {
 
   return (
     <Screen>
-      <Title>AI failure prediction & models</Title>
-      <Subtitle>Predict failure modes from operating parameters using machine learning models trained on benchmark data.</Subtitle>
+      <ScreenHeader
+        title="AI predictions"
+        subtitle="Benchmark-trained classifiers that estimate failure modes from operating parameters. Decision support only — maintenance personnel make the final call."
+        badge={
+          data ? (
+            <Badge
+              text={`${trainedCount}/${data.count} ready`}
+              tone={data.count > 0 && trainedCount === data.count ? 'success' : 'warning'}
+            />
+          ) : undefined
+        }
+      />
 
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      {loading && !data ? <Loading label="Loading model cards…" /> : null}
+      {error ? (
+        <Notice tone="danger" title="Could not reach the model service">
+          {error}
+        </Notice>
+      ) : null}
+
+      {loading && !data ? (
+        <Loading
+          label="Loading model cards…"
+          caption="Reading the trained weights and their evaluation metrics."
+        />
+      ) : null}
 
       {data ? (
         <>
-          <Notice tone="warning">
-            These models are trained on the AI4I 2020 predictive maintenance benchmark (kept separate from your plant records). They provide decision support — maintenance personnel make the final call.
+          <Notice tone="warning" title="Benchmark models, not your plant data">
+            These models are trained on the AI4I 2020 predictive maintenance benchmark, kept separate from your plant
+            records. Use them to understand what the data says, not as a work order.
           </Notice>
 
-          <Card>
-            <KeyValue label="Models available" value={`${trainedCount} of ${data.count}`} />
-            <KeyValue label="Decision threshold" value={pct(data.decisionThreshold)} />
-            <Muted>Tap a card to see its dataset, per-class metrics, confusion matrix and stated limitations.</Muted>
-          </Card>
+          <View style={st.statRow}>
+            <StatCard
+              label="Models ready"
+              value={`${trainedCount} / ${data.count}`}
+              hint="Layer 3 classifiers"
+              icon="hardware-chip-outline"
+              tone="primary"
+            />
+            <StatCard
+              label="Decision threshold"
+              value={pct(data.decisionThreshold)}
+              hint="probability that flags failure"
+              icon="options-outline"
+            />
+          </View>
+
+          <SectionHeader
+            title="Model cards"
+            icon="list-outline"
+            subtitle="Accuracy first, then the dataset, folds, confusion matrix and limitations behind it."
+          />
 
           {data.count === 0 ? (
             <EmptyState
-              title="No model cards are loaded."
+              icon="flask-outline"
+              title="No model cards are loaded"
               message="Run the training script to write model weights into backend/data/models."
             />
           ) : null}
@@ -450,25 +620,89 @@ export default function ModelsScreen() {
 }
 
 const st = StyleSheet.create({
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 },
-  cardName: { fontSize: 15, fontWeight: '800', color: theme.text, flexShrink: 1 },
-  bullet: { fontSize: 12, color: '#334155', lineHeight: 18, marginBottom: 4 },
-  classBlock: { borderLeftWidth: 3, borderLeftColor: theme.border, paddingLeft: 10, marginTop: 8 },
-  classTitle: { fontSize: 13, fontWeight: '700', color: theme.text },
-  matrix: { marginTop: 6, marginBottom: 6 },
-  matrixRow: { flexDirection: 'row', alignItems: 'center' },
-  matrixCell: { flex: 1, fontSize: 12, color: theme.text, textAlign: 'right', paddingVertical: 3, paddingHorizontal: 4 },
-  matrixLabel: { flex: 1.6, textAlign: 'left', color: theme.muted, fontWeight: '700' },
-  matrixHead: { color: theme.muted, fontWeight: '700' },
-  presetRow: { flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 12 },
-  presetItem: { flex: 1 },
-  radio: { fontSize: 13, fontWeight: '700', color: theme.text, paddingVertical: 10, textAlign: 'center' },
-  resultBlock: {
+  cardHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: theme.space.xs
+  },
+  cardHeadText: {
+    flex: 1,
+    marginRight: theme.space.sm
+  },
+  cardName: {
+    ...theme.font.cardTitle,
+    color: theme.text
+  },
+  classTitle: {
+    ...theme.font.cardTitle,
+    color: theme.text,
+    flexShrink: 1,
+    marginRight: theme.space.sm
+  },
+  statRow: {
+    flexDirection: 'row',
+    gap: theme.space.md,
+    marginTop: theme.space.md
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.space.sm,
+    marginTop: theme.space.md
+  },
+  bullet: {
+    ...theme.font.caption,
+    color: theme.textMuted,
+    lineHeight: 18,
+    marginBottom: theme.space.xxs
+  },
+  classBlock: {
+    borderLeftWidth: 3,
+    borderLeftColor: theme.primaryBorder,
+    paddingLeft: theme.space.md,
+    marginTop: theme.space.md
+  },
+  matrix: {
+    marginTop: theme.space.sm,
+    marginBottom: theme.space.sm,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 10,
-    backgroundColor: '#fff'
+    borderRadius: theme.radius.sm,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff'
+  },
+  matrixRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: theme.divider
+  },
+  matrixCell: {
+    flex: 1,
+    ...theme.font.caption,
+    color: theme.text,
+    textAlign: 'right',
+    paddingVertical: 6,
+    paddingHorizontal: theme.space.xs
+  },
+  matrixLabel: {
+    flex: 1.6,
+    textAlign: 'left',
+    color: theme.textMuted,
+    fontWeight: '700'
+  },
+  matrixHead: {
+    color: theme.textMuted,
+    fontWeight: '700'
+  },
+  presetRow: {
+    flexDirection: 'row',
+    gap: theme.space.sm,
+    marginTop: theme.space.sm,
+    marginBottom: theme.space.md
+  },
+  presetItem: {
+    flex: 1
   }
 });

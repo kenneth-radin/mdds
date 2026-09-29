@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
+import { View } from 'react-native';
 import { Link } from 'expo-router';
-import { Button, Card, Field, Notice, Screen, Subtitle, Title } from '../../components/ui';
+import {
+  Button,
+  Card,
+  Chip,
+  Field,
+  Notice,
+  Screen,
+  ScreenHeader,
+  theme
+} from '../../components/ui';
 import { useAuth } from '../../lib/auth';
 import { errorMessage } from '../../lib/api';
 
@@ -26,20 +36,65 @@ export default function RegisterScreen() {
 
   return (
     <Screen>
-      <Title>Create account</Title>
-      <Subtitle>Create a new account to continue.</Subtitle>
+      <ScreenHeader
+        title="Create account"
+        subtitle="Your account keeps the maintenance records and the analyses together, per technician."
+      />
+
       <Card>
-        <Field label="Full name" value={form.name} onChangeText={set('name')} placeholder="Juan Dela Cruz" />
-        <Field label="Email" value={form.email} onChangeText={set('email')} placeholder="you@example.com" keyboardType="email-address" />
-        <Field label="Username" value={form.username} onChangeText={set('username')} placeholder="juandc" />
-        <Field label="Password" value={form.password} onChangeText={set('password')} placeholder="At least 6 characters" secureTextEntry />
-        <Field label="Position / title (optional)" value={form.title} onChangeText={set('title')} placeholder="Maintenance Technician" />
-        {error ? <Notice tone="danger">{error}</Notice> : null}
-        <Button title={busy ? 'Creating…' : 'Create account'} onPress={submit} disabled={busy} />
+        <Field
+          label="Full name"
+          value={form.name}
+          onChangeText={set('name')}
+          placeholder="Juan Dela Cruz"
+          required
+        />
+        <Field
+          label="Email"
+          value={form.email}
+          onChangeText={set('email')}
+          placeholder="you@example.com"
+          keyboardType="email-address"
+          required
+        />
+        <Field
+          label="Username"
+          value={form.username}
+          onChangeText={set('username')}
+          placeholder="juandc"
+          helper="Used for audit trails on every record you add."
+          required
+        />
+        <Field
+          label="Password"
+          value={form.password}
+          onChangeText={set('password')}
+          placeholder="At least 6 characters"
+          secureTextEntry
+          required
+        />
+        <Field
+          label="Position / title (optional)"
+          value={form.title}
+          onChangeText={set('title')}
+          placeholder="Maintenance Technician"
+        />
+        {error ? (
+          <Notice tone="danger" title="Could not create the account">
+            {error}
+          </Notice>
+        ) : null}
+        <Button title="Create account" icon="person-add-outline" loading={busy} onPress={submit} />
       </Card>
-      <Link href="/(auth)/login" asChild>
-        <Button title="Back to sign in" variant="secondary" onPress={() => undefined} />
-      </Link>
+
+      <Card tone="muted">
+        <Chip label="Already registered?" icon="log-in-outline" />
+        <View style={{ marginTop: theme.space.sm }}>
+          <Link href="/(auth)/login" asChild>
+            <Button title="Back to sign in" variant="outline" icon="arrow-back-outline" onPress={() => undefined} />
+          </Link>
+        </View>
+      </Card>
     </Screen>
   );
 }
