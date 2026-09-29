@@ -308,6 +308,61 @@ export function ButtonGroup({ children }: { children: React.ReactNode }) {
   return <View style={s.buttonGroup}>{children}</View>;
 }
 
+/**
+ * Compact labelled icon button for the actions that belong to a single saved row
+ * (edit, remove). A full-width Button reads as the main call to action of the
+ * screen; these must stay visually secondary and sit side by side, so they use a
+ * 40dp pill with the label spelled out for accessibility and for gloved hands.
+ */
+export function IconAction({
+  icon,
+  label,
+  onPress,
+  tone = 'default',
+  disabled = false,
+  style
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  tone?: 'default' | 'primary' | 'danger';
+  disabled?: boolean;
+  style?: ViewStyle;
+}) {
+  const palette = {
+    default: { bg: theme.cardMuted, border: theme.border, fg: theme.textSecondary },
+    primary: { bg: theme.primarySoft, border: theme.primaryBorder, fg: theme.primary },
+    danger: { bg: theme.dangerSoft, border: theme.dangerBorder, fg: theme.danger }
+  }[tone];
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={8}
+      style={({ pressed }) => [
+        s.iconAction,
+        { backgroundColor: palette.bg, borderColor: palette.border },
+        pressed && !disabled && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+        disabled && { opacity: 0.55 },
+        style
+      ]}
+    >
+      <Ionicons name={icon} size={16} color={palette.fg} />
+      <Text style={[s.iconActionLabel, { color: palette.fg }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** Grouping row for IconAction buttons at the foot of a card. */
+export function ActionRow({ children }: { children: React.ReactNode }) {
+  return <View style={s.actionRow}>{children}</View>;
+}
+
 export function Input(props: React.ComponentProps<typeof TextInput>) {
   return (
     <TextInput
@@ -391,7 +446,7 @@ export function ChoiceGroup<T extends string>({
     <View style={s.field}>
       {label ? <Text style={s.label}>{label}</Text> : null}
       <View style={s.choiceContainer}>
-        {options.map((opt) => {
+        {options.map((opt, index) => {
           const selected = opt.value === value;
           return (
             <Pressable
@@ -399,7 +454,13 @@ export function ChoiceGroup<T extends string>({
               onPress={() => onChange(opt.value)}
               accessibilityRole="radio"
               accessibilityState={{ selected }}
-              style={[s.choiceRow, selected && s.choiceRowSelected]}
+              // The container already draws the outer border, so the last option
+              // must not add another one — otherwise the group ends in a double line.
+              style={[
+                s.choiceRow,
+                index === options.length - 1 && { borderBottomWidth: 0 },
+                selected && s.choiceRowSelected
+              ]}
             >
               <View style={[s.radioOuter, selected && s.radioOuterSelected]}>
                 {selected ? <View style={s.radioInner} /> : null}
@@ -465,23 +526,17 @@ export function Chip({
   icon?: keyof typeof Ionicons.glyphMap;
   tone?: 'default' | 'primary' | 'success' | 'warning';
 }) {
-  const isPrimary = tone === 'primary';
+  const palette = {
+    default: { bg: theme.cardMuted, border: theme.border, fg: theme.textSecondary },
+    primary: { bg: theme.primarySoft, border: theme.primaryBorder, fg: theme.primary },
+    success: { bg: theme.successSoft, border: theme.successBorder, fg: theme.success },
+    warning: { bg: theme.warningSoft, border: theme.warningBorder, fg: theme.warning }
+  }[tone];
+
   return (
-    <View
-      style={[
-        s.chip,
-        isPrimary && { backgroundColor: theme.primarySoft, borderColor: theme.primaryBorder }
-      ]}
-    >
-      {icon ? (
-        <Ionicons
-          name={icon}
-          size={13}
-          color={isPrimary ? theme.primary : theme.textMuted}
-          style={{ marginRight: 4 }}
-        />
-      ) : null}
-      <Text style={[s.chipText, isPrimary && { color: theme.primary, fontWeight: '600' }]}>
+    <View style={[s.chip, { backgroundColor: palette.bg, borderColor: palette.border }]}>
+      {icon ? <Ionicons name={icon} size={13} color={palette.fg} style={{ marginRight: 4 }} /> : null}
+      <Text style={[s.chipText, { color: palette.fg }]} numberOfLines={1}>
         {label}
       </Text>
     </View>
@@ -829,6 +884,28 @@ const s = StyleSheet.create({
     gap: theme.space.sm
   },
 
+  // Compact per-record actions
+  iconAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 40,
+    paddingVertical: theme.space.sm,
+    paddingHorizontal: theme.space.md,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1
+  },
+  iconActionLabel: {
+    ...theme.font.captionMedium
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: theme.space.sm
+  },
+
   // Fields
   field: {
     marginBottom: theme.space.md
@@ -927,6 +1004,9 @@ const s = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    minHeight: 26,
     backgroundColor: theme.cardMuted,
     borderColor: theme.border,
     borderWidth: 1,

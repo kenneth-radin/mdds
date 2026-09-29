@@ -15,7 +15,7 @@ const router = Router();
  * POST /api/auth/register with `role: "admin"` was instantly an administrator -
  * a privilege escalation. The first account created on an empty database becomes
  * admin; every later account is a technician. Roles are granted afterwards only
- * through POST /api/auth/users/:id/role, which requires an authenticated admin.
+ * through PUT /api/auth/users/:id/role, which requires an authenticated admin.
  */
 const registerSchema = z.object({
   name: z.string().min(1),
@@ -97,10 +97,11 @@ router.get(
 /**
  * Role management. Replaces the client-supplied `role` field that used to be
  * accepted on /auth/register (privilege escalation). Only an admin can list or
- * change roles, so a technician cannot promote themselves.
+ * change roles, so a technician cannot promote themselves. Full paths:
+ * GET /api/auth/users and PUT /api/auth/users/:id/role.
  */
 router.get(
-  '/users',
+  '/auth/users',
   requireAuth,
   requireRole('admin'),
   asyncHandler(async (_req, res) => {
@@ -110,7 +111,7 @@ router.get(
 );
 
 router.put(
-  '/users/:id/role',
+  '/auth/users/:id/role',
   requireAuth,
   requireRole('admin'),
   validateBody(z.object({ role: z.enum(['admin', 'technician', 'viewer']) })),

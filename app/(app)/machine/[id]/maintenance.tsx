@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
+  ActionRow,
   Badge,
   Button,
   Card,
@@ -10,6 +11,7 @@ import {
   Divider,
   EmptyState,
   Field,
+  IconAction,
   KeyValue,
   Notice,
   Screen,
@@ -31,11 +33,158 @@ const TYPE_HINTS: Record<(typeof types)[number], string> = {
   overhaul: 'Major strip-down and rebuild'
 };
 
+const TYPE_OPTIONS = types.map((item) => ({ value: item, label: item, hint: TYPE_HINTS[item] }));
+
+type MaintenanceForm = {
+  date: string;
+  problem: string;
+  action: string;
+  parts: string;
+  technician: string;
+  downtime: string;
+  cost: string;
+  loss: string;
+};
+
+const EMPTY_FORM: MaintenanceForm = {
+  date: '',
+  problem: '',
+  action: '',
+  parts: '',
+  technician: '',
+  downtime: '',
+  cost: '',
+  loss: ''
+};
+
+/** Stored ISO timestamp -> the `YYYY-MM-DD` text the date field expects. */
+function toDateInput(value?: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString().slice(0, 10) : '';
+}
+
+function toNumberInput(value?: number | null): string {
+  return value === null || value === undefined || !Number.isFinite(value) ? '' : String(value);
+}
+
+/** The field set, shared by the add form and by every inline edit form. */
+function MaintenanceFields({
+  form,
+  onField,
+  type,
+  onType
+}: {
+  form: MaintenanceForm;
+  onField: (key: keyof MaintenanceForm) => (value: string) => void;
+  type: (typeof types)[number];
+  onType: (value: (typeof types)[number]) => void;
+}) {
+  return (
+    <>
+      <Field
+        label="Date (YYYY-MM-DD)"
+        value={form.date}
+        onChangeText={onField('date')}
+        placeholder="2025-01-20"
+        helper="Leave blank to use today's date."
+      />
+      <ChoiceGroup label="Maintenance type" value={type} options={TYPE_OPTIONS} onChange={onType} />
+      <Field
+        label="Problem / symptoms"
+        value={form.problem}
+        onChangeText={onField('problem')}
+        placeholder="Abnormal noise and vibration at bearing"
+        required
+        multiline
+      />
+      <Field
+        label="Action taken"
+        value={form.action}
+        onChangeText={onField('action')}
+        placeholder="Replaced bearing and realigned coupling"
+        required
+        multiline
+      />
+      <Field
+        label="Parts replaced (comma separated)"
+        value={form.parts}
+        onChangeText={onField('parts')}
+        placeholder="bearing, seal"
+      />
+      <Field
+        label="Technician"
+        value={form.technician}
+        onChangeText={onField('technician')}
+        placeholder="Who performed the work"
+      />
+      <Field
+        label="Downtime (hours)"
+        value={form.downtime}
+        onChangeText={onField('downtime')}
+        keyboardType="numeric"
+        placeholder="0"
+      />
+      <Field label="Cost" value={form.cost} onChangeText={onField('cost')} keyboardType="numeric" placeholder="0" />
+      <Field
+        label="Production loss (units)"
+        value={form.loss}
+        onChangeText={onField('loss')}
+        keyboardType="numeric"
+        placeholder="0"
+      />
+    </>
+  );
+}
+
+/** The message to show the user, or null when the form may be sent. */
+function validateMaintenance(form: MaintenanceForm): string | null {
+  if (!form.problem.trim() || !form.action.trim()) return 'Problem / symptoms and action taken are required.';
+  if (form.date.trim() && !isValidDateInput(form.date)) return 'Date must look like 2025-01-20.';
+  if (!isValidNumberInput(form.downtime)) return 'Downtime must be a number.';
+  if (!isValidNumberInput(form.cost)) return 'Cost must be a number.';
+  if (!isValidNumberInput(form.loss)) return 'Production loss must be a number.';
+  return null;
+}
+
+function buildMaintenancePayload(form: MaintenanceForm, type: (typeof types)[number]) {
+  return {
+    date: toIsoOrNull(form.date) || new Date().toISOString(),
+    maintenanceType: type,
+    problem: form.problem.trim(),
+    action: form.action.trim(),
+    partsReplaced: splitCsv(form.parts),
+    technician: form.technician.trim(),
+    downtimeHours: toNumberOrNull(form.downtime) ?? 0,
+    cost: toNumberOrNull(form.cost),
+    productionLossUnits: toNumberOrNull(form.loss)
+  };
+}
+
+/** Prefills the edit form from a saved record. */
+function toMaintenanceForm(record: MaintenanceRecord): MaintenanceForm {
+  return {
+    date: toDateInput(record.date),
+    problem: record.problem,
+    action: record.action,
+    parts: record.partsReplaced.join(', '),
+    technician: record.technician || '',
+    downtime: toNumberInput(record.downtimeHours),
+    cost: toNumberInput(record.cost),
+    loss: toNumberInput(record.productionLossUnits)
+  };
+}
+
 export default function MaintenanceHistoryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
-  const [form, setForm] = useState({ date: '', problem: '', action: '', parts: '', technician: '', downtime: '', cost: '', loss: '' });
+  const [form, setForm] = useState<MaintenanceForm>(EMPTY_FORM);
   const [type, setType] = useState<(typeof types)[number]>('corrective');
+  // Only one record is editable at a time; its id decides which card shows the form.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<MaintenanceForm>(EMPTY_FORM);
+  const [editType, setEditType] = useState<(typeof types)[number]>('corrective');
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
@@ -55,52 +204,69 @@ export default function MaintenanceHistoryScreen() {
     }, [load])
   );
 
-  const set = (key: keyof typeof form) => (value: string) => setForm((prev) => ({ ...prev, [key]: value }));
+  const set = (key: keyof MaintenanceForm) => (value: string) => setForm((prev) => ({ ...prev, [key]: value }));
+  const setEditField = (key: keyof MaintenanceForm) => (value: string) =>
+    setEditForm((prev) => ({ ...prev, [key]: value }));
 
   const submit = async () => {
-    if (!form.problem.trim() || !form.action.trim()) {
-      setError('Problem / symptoms and action taken are required.');
-      return;
-    }
-    if (form.date.trim() && !isValidDateInput(form.date)) {
-      setError('Date must look like 2025-01-20.');
-      return;
-    }
-    if (!isValidNumberInput(form.downtime)) {
-      setError('Downtime must be a number.');
-      return;
-    }
-    if (!isValidNumberInput(form.cost)) {
-      setError('Cost must be a number.');
-      return;
-    }
-    if (!isValidNumberInput(form.loss)) {
-      setError('Production loss must be a number.');
+    const invalid = validateMaintenance(form);
+    if (invalid) {
+      setError(invalid);
       return;
     }
     setBusy(true);
     setError('');
     setFeedback('');
     try {
-      await api.post('/api/maintenance', {
-        machine: id,
-        date: toIsoOrNull(form.date) || new Date().toISOString(),
-        maintenanceType: type,
-        problem: form.problem.trim(),
-        action: form.action.trim(),
-        partsReplaced: splitCsv(form.parts),
-        technician: form.technician.trim(),
-        downtimeHours: toNumberOrNull(form.downtime) ?? 0,
-        cost: toNumberOrNull(form.cost),
-        productionLossUnits: toNumberOrNull(form.loss)
-      });
-      setForm({ date: '', problem: '', action: '', parts: '', technician: '', downtime: '', cost: '', loss: '' });
+      await api.post('/api/maintenance', { machine: id, ...buildMaintenancePayload(form, type) });
+      setForm(EMPTY_FORM);
+      setType('corrective');
       setFeedback('Maintenance record saved.');
       await load();
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const startEdit = (record: MaintenanceRecord) => {
+    setError('');
+    setFeedback('');
+    setEditingId(record._id);
+    setEditForm(toMaintenanceForm(record));
+    setEditType(record.maintenanceType);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm(EMPTY_FORM);
+  };
+
+  const saveEdit = async (record: MaintenanceRecord) => {
+    const invalid = validateMaintenance(editForm);
+    if (!invalid && !editForm.date.trim()) {
+      // An emptied date would otherwise be rewritten as today, which would move the
+      // machine's last-maintenance date and every countdown derived from it.
+      setError('Date is required when correcting a saved record.');
+      return;
+    }
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    setSavingId(record._id);
+    setError('');
+    setFeedback('');
+    try {
+      await api.put(`/api/maintenance/${record._id}`, buildMaintenancePayload(editForm, editType));
+      setEditingId(null);
+      setFeedback('Maintenance record updated.');
+      await load();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -118,6 +284,7 @@ export default function MaintenanceHistoryScreen() {
             setFeedback('');
             try {
               await api.del(`/api/maintenance/${record._id}`);
+              if (editingId === record._id) setEditingId(null);
               setFeedback('Maintenance record removed.');
               await load();
             } catch (err) {
@@ -154,62 +321,7 @@ export default function MaintenanceHistoryScreen() {
           icon="build-outline"
           subtitle="Write the problem and the action the way a technician would say them."
         />
-        <Field
-          label="Date (YYYY-MM-DD)"
-          value={form.date}
-          onChangeText={set('date')}
-          placeholder="2025-01-20"
-          helper="Leave blank to use today's date."
-        />
-        <ChoiceGroup
-          label="Maintenance type"
-          value={type}
-          options={types.map((item) => ({ value: item, label: item, hint: TYPE_HINTS[item] }))}
-          onChange={(value) => setType(value)}
-        />
-        <Field
-          label="Problem / symptoms"
-          value={form.problem}
-          onChangeText={set('problem')}
-          placeholder="Abnormal noise and vibration at bearing"
-          required
-          multiline
-        />
-        <Field
-          label="Action taken"
-          value={form.action}
-          onChangeText={set('action')}
-          placeholder="Replaced bearing and realigned coupling"
-          required
-          multiline
-        />
-        <Field
-          label="Parts replaced (comma separated)"
-          value={form.parts}
-          onChangeText={set('parts')}
-          placeholder="bearing, seal"
-        />
-        <Field
-          label="Technician"
-          value={form.technician}
-          onChangeText={set('technician')}
-          placeholder="Who performed the work"
-        />
-        <Field
-          label="Downtime (hours)"
-          value={form.downtime}
-          onChangeText={set('downtime')}
-          keyboardType="numeric"
-          placeholder="0"
-        />
-        <Field label="Cost" value={form.cost} onChangeText={set('cost')} keyboardType="numeric" placeholder="0" />
-        <Field
-          label="Production loss (units)"
-          value={form.loss}
-          onChangeText={set('loss')}
-          keyboardType="numeric"
-          placeholder="0"
-        />
+        <MaintenanceFields form={form} onField={set} type={type} onType={(value) => setType(value)} />
         <Button
           title="Save maintenance record"
           icon="checkmark-outline"
@@ -231,36 +343,71 @@ export default function MaintenanceHistoryScreen() {
           message="Add the first maintenance record above so future analyses have something to compare against."
         />
       ) : (
-        records.map((record) => (
-          <Card key={record._id}>
-            <View style={st.rowHead}>
-              <Text style={st.rowTitle}>{fmtDate(record.date)}</Text>
-              <Badge text={record.maintenanceType} tone="info" />
-            </View>
-            <KeyValue label="Problem" value={record.problem} />
-            <KeyValue label="Action" value={record.action} />
-            <KeyValue
-              label="Parts replaced"
-              value={record.partsReplaced.length ? record.partsReplaced.join(', ') : '—'}
-            />
-            {record.cost !== null ? <KeyValue label="Cost" value={fmtNumber(record.cost)} /> : null}
-            {record.productionLossUnits !== null ? (
-              <KeyValue label="Production loss" value={fmtNumber(record.productionLossUnits)} />
-            ) : null}
-            {record.notes ? <KeyValue label="Notes" value={record.notes} /> : null}
-            <View style={st.chipRow}>
-              <Chip label={`${fmtNumber(record.downtimeHours)} h downtime`} icon="time-outline" />
-              {record.technician ? <Chip label={record.technician} icon="person-outline" /> : null}
-            </View>
-            <Divider />
-            <Button
-              title="Remove record"
-              variant="ghost"
-              icon="trash-outline"
-              onPress={() => removeRecord(record)}
-            />
-          </Card>
-        ))
+        records.map((record) => {
+          const editing = editingId === record._id;
+          return (
+            <Card key={record._id} tone={editing ? 'hero' : 'default'}>
+              <View style={st.rowHead}>
+                <Text style={st.rowTitle}>{fmtDate(record.date)}</Text>
+                <Badge text={record.maintenanceType} tone="info" />
+              </View>
+
+              {editing ? (
+                <>
+                  <SectionHeader
+                    title="Correct this record"
+                    icon="create-outline"
+                    subtitle="Analyses and the maintenance countdown read the corrected values."
+                  />
+                  <MaintenanceFields
+                    form={editForm}
+                    onField={setEditField}
+                    type={editType}
+                    onType={(value) => setEditType(value)}
+                  />
+                  <ActionRow>
+                    <IconAction icon="close-outline" label="Cancel" onPress={cancelEdit} />
+                    <IconAction
+                      icon="checkmark-outline"
+                      label={savingId === record._id ? 'Saving…' : 'Save changes'}
+                      tone="primary"
+                      disabled={savingId === record._id}
+                      onPress={() => void saveEdit(record)}
+                    />
+                  </ActionRow>
+                </>
+              ) : (
+                <>
+                  <KeyValue label="Problem" value={record.problem} />
+                  <KeyValue label="Action" value={record.action} />
+                  <KeyValue
+                    label="Parts replaced"
+                    value={record.partsReplaced.length ? record.partsReplaced.join(', ') : '—'}
+                  />
+                  {record.cost !== null ? <KeyValue label="Cost" value={fmtNumber(record.cost)} /> : null}
+                  {record.productionLossUnits !== null ? (
+                    <KeyValue label="Production loss" value={fmtNumber(record.productionLossUnits)} />
+                  ) : null}
+                  {record.notes ? <KeyValue label="Notes" value={record.notes} /> : null}
+                  <View style={st.chipRow}>
+                    <Chip label={`${fmtNumber(record.downtimeHours)} h downtime`} icon="time-outline" />
+                    {record.technician ? <Chip label={record.technician} icon="person-outline" /> : null}
+                  </View>
+                  <Divider />
+                  <ActionRow>
+                    <IconAction
+                      icon="trash-outline"
+                      label="Remove"
+                      tone="danger"
+                      onPress={() => removeRecord(record)}
+                    />
+                    <IconAction icon="create-outline" label="Edit" tone="primary" onPress={() => startEdit(record)} />
+                  </ActionRow>
+                </>
+              )}
+            </Card>
+          );
+        })
       )}
     </Screen>
   );
