@@ -12,11 +12,33 @@ import { runAnalysisForCase } from './case.routes';
 const router = Router();
 router.use(requireAuth);
 
-const reviewSchema = z.object({
-  decision: z.enum(['accepted', 'modified', 'rejected']),
-  modifiedSuggestion: z.string().optional(),
-  reviewerNote: z.string().optional()
-});
+/**
+ * §25: a rejection must always carry a reason, and a modification must always
+ * carry the modified suggestion. Enforced server-side so it cannot be bypassed
+ * by calling the API directly; the mobile form surfaces these as field errors.
+ */
+const reviewSchema = z
+  .object({
+    decision: z.enum(['accepted', 'modified', 'rejected']),
+    modifiedSuggestion: z.string().optional(),
+    reviewerNote: z.string().optional()
+  })
+  .superRefine((value, ctx) => {
+    if (value.decision === 'rejected' && !value.reviewerNote?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reviewerNote'],
+        message: 'A reason is required when rejecting a suggestion.'
+      });
+    }
+    if (value.decision === 'modified' && !value.modifiedSuggestion?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['modifiedSuggestion'],
+        message: 'Describe the modified suggestion before saving it.'
+      });
+    }
+  });
 
 const outcomeSchema = z.object({
   result: z.enum(['resolved', 'partially-resolved', 'not-resolved']),

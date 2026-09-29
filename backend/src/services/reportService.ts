@@ -32,7 +32,7 @@ export async function buildSummaryReport() {
     TestingCase.countDocuments({})
   ]);
 
-  const [machinesByCriticality, maintenanceByType, failuresBySeverity, casesByStatus, downtimeAgg, testingAgg] =
+  const [machinesByCriticality, maintenanceByType, failuresBySeverity, casesByStatus, downtimeAgg, testingAgg, decisionAgg] =
     await Promise.all([
       groupCount(Machine as never, 'criticality'),
       groupCount(MaintenanceRecord as never, 'maintenanceType'),
@@ -41,12 +41,26 @@ export async function buildSummaryReport() {
       MaintenanceRecord.aggregate([{ $group: { _id: null, total: { $sum: '$downtimeHours' } } }]),
       TestingCase.aggregate([
         { $group: { _id: null, total: { $sum: 1 }, matched: { $sum: { $cond: ['$matched', 1, 0] } } } }
-      ])
+      ]),
+      // §46: how maintenance personnel actually responded to the AI suggestions.
+      MaintenanceCase.aggregate([{ $group: { _id: '$review.decision', count: { $sum: 1 } } }])
     ]);
 
   const overallDowntimeHours = Number(downtimeAgg[0]?.total || 0);
   const testingTotal = Number(testingAgg[0]?.total || 0);
   const testingMatched = Number(testingAgg[0]?.matched || 0);
+
+  // Bucket every case by its review decision. Cases never reviewed (review.decision
+  // absent/null) count as notReviewed, so the four buckets always sum to the
+  // total number of cases - the values are derived, never assumed.
+  const suggestionDecisions = { accepted: 0, modified: 0, rejected: 0, notReviewed: 0 };
+  for (const row of decisionAgg as Array<{ _id: string | null; count: number }>) {
+    if (row._id === 'accepted' || row._id === 'modified' || row._id === 'rejected') {
+      suggestionDecisions[row._id] = row.count;
+    } else {
+      suggestionDecisions.notReviewed += row.count;
+    }
+  }
 
   return {
     generatedAt: new Date().toISOString(),
@@ -73,6 +87,7 @@ export async function buildSummaryReport() {
       total: testingTotal,
       matched: testingMatched,
       matchRate: testingTotal > 0 ? round((testingMatched / testingTotal) * 100, 1) : null
-    }
+    },
+    suggestionDecisions
   };
 }

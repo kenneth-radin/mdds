@@ -5,6 +5,7 @@ import { MaintenanceRecord } from '../models/MaintenanceRecord';
 import { FailureRecord } from '../models/FailureRecord';
 import { MaintenanceCase } from '../models/MaintenanceCase';
 import { OperationalData } from '../models/OperationalData';
+import { TestingCase } from '../models/TestingCase';
 import { asyncHandler, HttpError } from '../middleware/error';
 import { requireAuth } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
@@ -28,8 +29,12 @@ const machineSchema = z.object({
   ratedVoltage: z.number().nullable().optional(),
   ratedCurrent: z.number().nullable().optional(),
   designSpeedRpm: z.number().nullable().optional(),
+  ratedCapacity: z.number().nullable().optional(),
+  capacityUnit: z.string().optional(),
+  yearAcquired: z.number().int().min(1800).max(2100).nullable().optional(),
   operatingHours: z.number().min(0).optional(),
   lastMaintenanceDate: dateString.nullable().optional(),
+  recommendedMaintenanceIntervalDays: z.number().min(0).nullable().optional(),
   notes: z.string().optional()
 });
 
@@ -97,11 +102,14 @@ router.delete(
   '/machines/:id',
   asyncHandler(async (req, res) => {
     const machine = await resolveMachine(String(req.params.id));
+    // Every collection that references `machine` must be cleaned up together,
+    // otherwise records survive with a dangling reference to a deleted machine.
     await Promise.all([
       MaintenanceRecord.deleteMany({ machine: machine._id }),
       FailureRecord.deleteMany({ machine: machine._id }),
       OperationalData.deleteMany({ machine: machine._id }),
       MaintenanceCase.deleteMany({ machine: machine._id }),
+      TestingCase.deleteMany({ machine: machine._id }),
       machine.deleteOne()
     ]);
     res.json({ deleted: true });

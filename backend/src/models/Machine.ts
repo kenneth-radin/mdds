@@ -17,8 +17,16 @@ export interface IMachine {
   ratedVoltage?: number | null;
   ratedCurrent?: number | null;
   designSpeedRpm?: number | null;
+  /** Rated / design capacity, e.g. 500 (see capacityUnit) — §11. */
+  ratedCapacity?: number | null;
+  /** Unit for ratedCapacity: kg, L, kW, t/h, ... — §11. */
+  capacityUnit?: string;
+  /** Year the machine was acquired / put into service — §11. */
+  yearAcquired?: number | null;
   operatingHours: number;
   lastMaintenanceDate?: Date | null;
+  /** Recommended maintenance interval in days — §11 / §14. */
+  recommendedMaintenanceIntervalDays?: number | null;
   notes: string;
   createdBy: Types.ObjectId;
   createdAt: Date;
@@ -40,8 +48,12 @@ const machineSchema = new Schema<IMachine>(
     ratedVoltage: { type: Number, default: null },
     ratedCurrent: { type: Number, default: null },
     designSpeedRpm: { type: Number, default: null },
+    ratedCapacity: { type: Number, default: null },
+    capacityUnit: { type: String, default: '', trim: true },
+    yearAcquired: { type: Number, default: null },
     operatingHours: { type: Number, default: 0, min: 0 },
     lastMaintenanceDate: { type: Date, default: null },
+    recommendedMaintenanceIntervalDays: { type: Number, default: null, min: 0 },
     notes: { type: String, default: '', trim: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
   },

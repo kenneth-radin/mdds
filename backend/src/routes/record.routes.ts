@@ -4,6 +4,7 @@ import { MaintenanceRecord } from '../models/MaintenanceRecord';
 import { FailureRecord } from '../models/FailureRecord';
 import { OperationalData } from '../models/OperationalData';
 import { Machine } from '../models/Machine';
+import { MaintenanceCase } from '../models/MaintenanceCase';
 import { asyncHandler, HttpError } from '../middleware/error';
 import { requireAuth } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
@@ -160,6 +161,110 @@ router.get(
     const machine = await resolveMachine(String(req.params.id));
     const records = await OperationalData.find({ machine: machine._id }).sort({ date: -1 }).lean();
     res.json({ records, count: records.length });
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Update / delete for the historical record collections.
+//
+// §12 and §13 require that historical maintenance and failure records can be
+// edited and removed, not only created. Before this, the API exposed POST/GET
+// only, so a typo in a historical record was permanent and the UI had no way to
+// offer an edit or delete action.
+// ---------------------------------------------------------------------------
+
+router.put(
+  '/failures/:id',
+  validateBody(failureSchema.partial()),
+  asyncHandler(async (req, res) => {
+    const record = await FailureRecord.findById(req.params.id);
+    if (!record) throw new HttpError(404, 'Failure record not found.');
+
+    const body = req.body as Partial<z.infer<typeof failureSchema>>;
+    if (body.machine) {
+      const machine = await resolveMachine(body.machine);
+      record.machine = machine._id;
+    }
+    if (body.date) record.date = new Date(body.date);
+    Object.assign(record, body, { date: record.date, machine: record.machine });
+    await record.save();
+    res.json({ record });
+  })
+);
+
+router.delete(
+  '/failures/:id',
+  asyncHandler(async (req, res) => {
+    const record = await FailureRecord.findByIdAndDelete(req.params.id);
+    if (!record) throw new HttpError(404, 'Failure record not found.');
+    res.json({ deleted: true });
+  })
+);
+
+router.put(
+  '/operational-data/:id',
+  validateBody(operationalSchema.partial()),
+  asyncHandler(async (req, res) => {
+    const record = await OperationalData.findById(req.params.id);
+    if (!record) throw new HttpError(404, 'Operational record not found.');
+
+    const body = req.body as Partial<z.infer<typeof operationalSchema>>;
+    if (body.machine) {
+      const machine = await resolveMachine(body.machine);
+      record.machine = machine._id;
+    }
+    if (body.date) record.date = new Date(body.date);
+    Object.assign(record, body, { date: record.date, machine: record.machine });
+    await record.save();
+
+    // POST mirrors new operating hours onto the machine; PUT must too, or the
+    // machine profile silently disagrees with its own operational history.
+    if (typeof body.operatingHours === 'number') {
+      await Machine.updateOne({ _id: record.machine }, { $set: { operatingHours: body.operatingHours } });
+    }
+    res.json({ record });
+  })
+);
+
+router.delete(
+  '/operational-data/:id',
+  asyncHandler(async (req, res) => {
+    const record = await OperationalData.findByIdAndDelete(req.params.id);
+    if (!record) throw new HttpError(404, 'Operational record not found.');
+    res.json({ deleted: true });
+  })
+);
+
+router.delete(
+  '/maintenance/:id',
+  asyncHandler(async (req, res) => {
+    const record = await MaintenanceRecord.findById(req.params.id);
+    if (!record) throw new HttpError(404, 'Maintenance record not found.');
+
+    const machineId = record.machine;
+
+    // A completed case may point at this record; drop the link rather than
+    // leave it dangling at a document that no longer exists.
+    await MaintenanceCase.updateOne(
+      { linkedMaintenanceRecord: record._id },
+      { $set: { linkedMaintenanceRecord: null } }
+    );
+
+    await record.deleteOne();
+
+    // If this was the newest record, machine.lastMaintenanceDate would otherwise
+    // keep pointing at a deleted row. Recompute it from what remains.
+    const machine = await Machine.findById(machineId);
+    if (machine) {
+      const [latest] = await MaintenanceRecord.find({ machine: machine._id })
+        .sort({ date: -1 })
+        .limit(1)
+        .lean();
+      machine.lastMaintenanceDate = latest ? (latest.date as Date) : null;
+      await machine.save();
+    }
+
+    res.json({ deleted: true });
   })
 );
 
