@@ -19,7 +19,7 @@ import {
   SectionHeader,
   theme
 } from '../../../components/ui';
-import { api, errorMessage } from '../../../lib/api';
+import { ApiError, api, errorMessage } from '../../../lib/api';
 import { useAuth } from '../../../lib/auth';
 import { API_URL } from '../../../lib/config';
 import { fmtDateTime } from '../../../lib/format';
@@ -137,7 +137,14 @@ function TeamSection() {
       setFeedback(`${account.name || account.username}'s account was deleted. Their records remain.`);
       await load();
     } catch (err) {
-      setError(errorMessage(err));
+      // A 404 here means the API answering at API_URL is an older build without
+      // the deletion route, which is a deployment gap rather than a user mistake,
+      // so say so plainly instead of surfacing Express's "Route not found" text.
+      setError(
+        err instanceof ApiError && err.status === 404
+          ? `The backend at ${API_URL} does not have account deletion yet (DELETE /api/auth/users/:id). Deploy the latest backend build, then try again. No account was changed.`
+          : errorMessage(err)
+      );
     } finally {
       setDeletingId(null);
     }
