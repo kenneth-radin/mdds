@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import {
   Badge,
   Button,
@@ -27,7 +27,6 @@ function tone(criticality: Machine['criticality']): 'info' | 'warning' | 'danger
 }
 
 export default function MachinesScreen() {
-  const router = useRouter();
   const [machines, setMachines] = useState<Machine[]>([]);
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
@@ -73,7 +72,6 @@ export default function MachinesScreen() {
         onChangeText={setSearch}
         placeholder="Search machine ID, name, type, location"
       />
-      <Button title="Add machine" icon="add-outline" onPress={() => router.push('/(app)/machine/new')} />
 
       {error ? (
         <Notice tone="danger" title="Could not load machines">
@@ -90,12 +88,7 @@ export default function MachinesScreen() {
           message={
             search.trim()
               ? 'Try a shorter search term, or clear the search box to list every machine.'
-              : 'Add a machine to begin recording historical maintenance data.'
-          }
-          action={
-            search.trim()
-              ? undefined
-              : { title: 'Add machine', onPress: () => router.push('/(app)/machine/new') }
+              : 'The single compressor CMP-001 is seeded by the backend on startup.'
           }
         />
       ) : null}

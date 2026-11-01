@@ -75,49 +75,13 @@ export interface EquipProfile {
 
 export const PROFILES: EquipProfile[] = [
   {
-    id: 'e1', equipmentId: 'MTR-001', name: 'Motor Pump 01', type: 'Centrifugal Pump Motor',
-    manufacturer: 'ACME Industrial', model: 'CP-4000', ratedVoltage: 230, ratedCurrent: 12, ratedPowerKw: 3.0,
-    installDate: '2021-03-15', location: 'Process Hall - Line A', operatingHoursBase: 12480,
-    start: { temperature: 54, vibration: 1.7, voltage: 221, current: 9.6 },
-    target: { temperature: 71.5, vibration: 3.6, voltage: 218, current: 12.4 },
-    noise: { temperature: 1.4, vibration: 0.22, voltage: 1.6, current: 0.5 },
-    lastMaintenanceDate: '2025-08-02'
-  },
-  {
-    id: 'e2', equipmentId: 'MTR-002', name: 'Motor Pump 02', type: 'Centrifugal Pump Motor',
-    manufacturer: 'ACME Industrial', model: 'CP-3200', ratedVoltage: 230, ratedCurrent: 10, ratedPowerKw: 2.4,
-    installDate: '2022-01-20', location: 'Process Hall - Line B', operatingHoursBase: 9050,
-    start: { temperature: 52, vibration: 1.5, voltage: 220, current: 8.6 },
-    target: { temperature: 57, vibration: 1.9, voltage: 220, current: 9.3 },
-    noise: { temperature: 1.1, vibration: 0.18, voltage: 1.4, current: 0.4 },
-    lastMaintenanceDate: '2026-05-11'
-  },
-  {
-    id: 'e3', equipmentId: 'MTR-003', name: 'Conveyor Motor 01', type: 'Gearbox Drive Motor',
-    manufacturer: 'Vector Drives', model: 'GB-7500', ratedVoltage: 230, ratedCurrent: 11, ratedPowerKw: 2.8,
-    installDate: '2020-09-05', location: 'Sorting Bay - Belt 3', operatingHoursBase: 17240,
-    start: { temperature: 55, vibration: 1.9, voltage: 222, current: 9.8 },
-    target: { temperature: 66, vibration: 3.1, voltage: 221, current: 11.6 },
-    noise: { temperature: 1.2, vibration: 0.2, voltage: 1.5, current: 0.45 },
-    lastMaintenanceDate: '2026-02-18'
-  },
-  {
-    id: 'e4', equipmentId: 'MTR-004', name: 'Industrial Fan 01', type: 'Axial Fan Motor',
-    manufacturer: 'Airflow Systems', model: 'AX-900', ratedVoltage: 230, ratedCurrent: 15, ratedPowerKw: 3.4,
-    installDate: '2021-11-08', location: 'Ventilation - Roof C', operatingHoursBase: 11200,
-    start: { temperature: 44, vibration: 1.8, voltage: 219, current: 6.9 },
-    target: { temperature: 46, vibration: 2.1, voltage: 219, current: 7.4 },
-    noise: { temperature: 1.0, vibration: 0.16, voltage: 1.4, current: 0.35 },
-    lastMaintenanceDate: '2026-07-22'
-  },
-  {
-    id: 'e5', equipmentId: 'MTR-005', name: 'Compressor Motor 01', type: 'Screw Compressor Motor',
-    manufacturer: 'VTX Compressors', model: 'SC-5200', ratedVoltage: 230, ratedCurrent: 12, ratedPowerKw: 4.1,
-    installDate: '2019-06-30', location: 'Utility Plant - Bay 2', operatingHoursBase: 22460,
-    start: { temperature: 60, vibration: 2.3, voltage: 220, current: 10.4 },
-    target: { temperature: 88.5, vibration: 5.2, voltage: 217, current: 13.1 },
-    noise: { temperature: 1.6, vibration: 0.26, voltage: 1.8, current: 0.6 },
-    lastMaintenanceDate: '2025-11-09'
+    id: 'c1', equipmentId: 'CMP-001', name: 'Main Compressor', type: 'Screw Compressor',
+    manufacturer: 'VTX Compressors', model: 'SC-7200', ratedVoltage: 415, ratedCurrent: 16, ratedPowerKw: 8.5,
+    installDate: '2020-04-10', location: 'Utility Plant - Bay 1', operatingHoursBase: 26800,
+    start: { temperature: 55, vibration: 1.8, voltage: 405, current: 12 },
+    target: { temperature: 72, vibration: 3.0, voltage: 408, current: 14 },
+    noise: { temperature: 1.2, vibration: 0.18, voltage: 1.5, current: 0.4 },
+    lastMaintenanceDate: '2026-06-15'
   }
 ];
 
@@ -252,3 +216,4 @@ export function buildSeed(): { equipment: Equipment[]; readings: SensorReading[]
   }
   return { equipment, readings, maintenance };
 }
+

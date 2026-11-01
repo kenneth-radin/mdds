@@ -218,7 +218,27 @@ export interface AppState {
   rules: DecisionRule[];
   recommendations: Recommendation[];
   predictions: Prediction[];
+  anomalies: AnomalyAlert[];
   users: User[];
   simulation: SimulationConfig;
   version: number;
+}
+export interface AnomalyResult {
+  anomaly: boolean;
+  severity: 'normal' | 'warning' | 'critical';
+  parameter: 'temperature' | 'vibration';
+  parameterLabel: string;
+  reason: string;
+  suggestion: string;
+}
+
+export interface AnomalyAlert {
+  id: string;
+  equipmentId: string;
+  timestamp: string;
+  severity: 'normal' | 'warning' | 'critical';
+  parameter: 'temperature' | 'vibration';
+  parameterLabel: string;
+  reason: string;
+  suggestion: string;
 }

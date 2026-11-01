@@ -7,15 +7,14 @@ import {
 import { useAppState } from '../../hooks/useAppState';
 import { store } from '../../services/store';
 import { currentUser, logout } from '../../services/authService';
-import { addReading } from '../../services/sensorService';
-import { generateSimulatedReading } from '../../services/simulatedSource';
+
 import { listRecommendations } from '../../services/recommendationService';
+import { startFeed } from '../../services/realtimeService';
 
 type IconType = typeof Cog;
 
 const NAV: { to: string; label: string; icon: IconType; end?: boolean }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/equipment', label: 'Equipment', icon: Cog },
   { to: '/monitoring', label: 'Live Monitoring', icon: Activity },
   { to: '/recommendations', label: 'Recommendations', icon: CheckCircle2 },
   { to: '/maintenance', label: 'Maintenance', icon: Wrench },
@@ -39,22 +38,13 @@ export default function AppLayout() {
   }, [user]);
   if (!user) return null;
 
-  // Live simulation: when enabled, periodically ingest a sample for each monitored equipment.
+  // Live simulation: when enabled, poll the simulated feed for the single
+  // compressor via the real-time service (setInterval + store update). The
+  // loop is started/stopped per render so pause/speed changes take effect.
   useEffect(() => {
     if (!state.simulation.enabled) return;
-    const ms = Math.max(2000, state.simulation.intervalSeconds * 1000 / (state.simulation.speed || 1));
-    const id = setInterval(() => {
-      try {
-        for (const eq of store.get().equipment) {
-          if (!eq.monitoringEnabled) continue;
-          const sample = generateSimulatedReading(eq);
-          addReading({ ...sample, observation: 'Real-time simulated feed' });
-        }
-      } catch (e) {
-        // ignore
-      }
-    }, ms);
-    return () => clearInterval(id);
+    const stop = startFeed(state.simulation.intervalSeconds);
+    return () => stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.simulation.enabled, state.simulation.intervalSeconds, state.simulation.speed]);
 

@@ -11,6 +11,19 @@ dist/
 _expo/
 .expo/
 
+# Native projects (regenerated with `npx expo prebuild`)
+/android
+/ios
+
+# Signing material
+*.keystore
+*.jks
+keystore.properties
+
+# Built artifacts (local release builds)
+*.apk
+*.aab
+
 # Logs
 *.log
 _dev.log

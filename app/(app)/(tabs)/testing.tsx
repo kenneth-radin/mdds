@@ -118,7 +118,7 @@ export default function TestingScreen() {
         <EmptyState
           icon="construct-outline"
           title="No machines registered yet"
-          message="Register a machine before recording testing cases."
+          message="The compressor CMP-001 is seeded by the backend on startup. Record a testing case for it."
         />
       ) : (
         <Card>

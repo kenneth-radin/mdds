@@ -62,6 +62,10 @@ function uid(): string {
   return 'eq-' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
 }
 
+// Keep the existing threshold bands for the single compressor. Voltage and
+// current are retained in the threshold config for backwards compatibility with
+// any code that still reads them; the live dashboard and anomaly layer now
+// focus exclusively on temperature and vibration.
 export function defaultThresholds(): Equipment['thresholds'] {
   return {
     temperature: {
@@ -83,40 +87,6 @@ export function defaultThresholds(): Equipment['thresholds'] {
   };
 }
 
-export function addEquipment(input: {
-  equipmentId: string; name: string; type: string; manufacturer: string; model: string;
-  ratedVoltage: number; ratedCurrent: number; location: string;
-}): Equipment {
-  const eq: Equipment = {
-    id: uid(),
-    equipmentId: input.equipmentId,
-    name: input.name,
-    type: input.type,
-    equipmentType: 'Motor',
-    manufacturer: input.manufacturer,
-    model: input.model,
-    ratedVoltage: input.ratedVoltage,
-    ratedCurrent: input.ratedCurrent,
-    ratedPowerKw: Math.round((input.ratedVoltage * input.ratedCurrent * 0.001) * 10) / 10,
-    operatingHours: 0,
-    installDate: new Date().toISOString().slice(0, 10),
-    location: input.location,
-    status: 'NORMAL',
-    lastMaintenanceDate: null,
-    specs: { bearings: '', cooling: '', driveType: '', enclosure: '', notes: '' },
-    thresholds: defaultThresholds(),
-    monitoringEnabled: true
-  };
-  store.update((s) => ({ ...s, equipment: [...s.equipment, eq] }));
-  return eq;
-}
-
-export function removeEquipment(equipmentId: string): void {
-  store.update((s) => ({
-    ...s,
-    equipment: s.equipment.filter((e) => e.equipmentId !== equipmentId),
-    readings: s.readings.filter((r) => r.equipmentId !== equipmentId),
-    maintenance: s.maintenance.filter((m) => m.equipmentId !== equipmentId),
-    recommendations: s.recommendations.filter((r) => r.equipmentId !== equipmentId)
-  }));
-}
+// NOTE: addEquipment and removeEquipment were removed in favour of a single,
+// fixed compressor. Do not export addEquipment/removeEquipment anymore -- the
+// app now manages one machine defined in src/data/seed.ts.

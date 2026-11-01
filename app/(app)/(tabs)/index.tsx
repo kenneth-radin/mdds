@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import {
   Button,
   ButtonGroup,
@@ -22,7 +22,6 @@ import { SummaryReport } from '../../../lib/types';
 import { fmtNumber } from '../../../lib/format';
 
 export default function DashboardScreen() {
-  const router = useRouter();
   const [report, setReport] = useState<SummaryReport | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -67,7 +66,6 @@ export default function DashboardScreen() {
           icon="construct-outline"
           title="No data yet"
           message={report.message}
-          action={{ title: 'Add a machine', onPress: () => router.push('/(app)/machine/new') }}
         />
       ) : null}
 
@@ -149,12 +147,6 @@ export default function DashboardScreen() {
               title="New maintenance case"
               icon="add-outline"
               onPress={() => router.push('/(app)/case/new')}
-            />
-            <Button
-              title="Register a machine"
-              variant="secondary"
-              icon="construct-outline"
-              onPress={() => router.push('/(app)/machine/new')}
             />
           </ButtonGroup>
         </>

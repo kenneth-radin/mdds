@@ -25,6 +25,7 @@ function freshSeed(): AppState {
     maintenance,
     rules: SEED_RULES,
     recommendations: [],
+    anomalies: [],
     predictions: [],
     users: SEED_USERS,
     simulation: { enabled: false, intervalSeconds: 5, jitter: 0.35, speed: 1 },

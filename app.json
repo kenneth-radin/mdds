@@ -11,7 +11,8 @@
       "bundleIdentifier": "com.plant.mdss"
     },
     "android": {
-      "package": "com.plant.mdss"
+      "package": "com.plant.mdss",
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro"

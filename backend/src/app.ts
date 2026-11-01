@@ -5,6 +5,7 @@ import { env } from './config/env';
 import authRoutes from './routes/auth.routes';
 import machineRoutes from './routes/machine.routes';
 import recordRoutes from './routes/record.routes';
+import sensorRoutes from './routes/sensor.routes';
 import caseRoutes from './routes/case.routes';
 import caseReviewRoutes from './routes/caseReview.routes';
 import testingRoutes from './routes/testing.routes';
@@ -37,6 +38,7 @@ export function createApp() {
   app.use('/api', authRoutes);
   app.use('/api', machineRoutes);
   app.use('/api', recordRoutes);
+  app.use('/api', sensorRoutes);
   app.use('/api', caseRoutes);
   app.use('/api', caseReviewRoutes);
   app.use('/api', testingRoutes);

@@ -14,10 +14,9 @@ import { conditionHex } from '../utils/params';
 export default function ReportsPage() {
   const state = useAppState();
   const [tab, setTab] = useState('condition');
-  const [eqSel, setEqSel] = useState(listEquipment()[0]?.equipmentId || '');
 
   const condition = equipmentConditionReport();
-  const trend = sensorTrendReport(eqSel);
+  const trend = sensorTrendReport(listEquipment()[0]?.equipmentId || '');
   const maintenance = maintenanceReport();
   const recommendations = recommendationReport();
   const failures = failureReport();
@@ -85,10 +84,7 @@ export default function ReportsPage() {
 
       {tab === 'condition' && renderTable(condition)}
       {tab === 'trends' && (
-        <Card title="Sensor trend report" subtitle="Select an equipment">
-          <select value={eqSel} onChange={(e) => setEqSel(e.target.value)} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
-            {listEquipment().map((e) => <option key={e.id} value={e.equipmentId}>{e.equipmentId} · {e.name}</option>)}
-          </select>
+        <Card title="Sensor trend report" subtitle="Single compressor · temperature & vibration">
           {renderTable(trend, 'No sensor data')}
         </Card>
       )}

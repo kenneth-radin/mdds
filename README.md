@@ -214,9 +214,10 @@ npm run expo:start
 ```text
 GET    /api/health
 POST   /api/auth/register         POST /api/auth/login        GET /api/auth/me
-GET    /api/machines              POST /api/machines
+GET    /api/machines
 GET    /api/machines/:id          PUT  /api/machines/:id      DELETE /api/machines/:id
 GET    /api/machines/:id/summary
+GET    /api/sensor-data/latest    GET  /api/sensor-data/history    POST /api/sensor-data     GET /api/sensor-data/stream
 GET    /api/machines/:id/maintenance   POST /api/maintenance   GET/PUT /api/maintenance/:id
 GET    /api/machines/:id/failures      POST /api/failures
 GET    /api/machines/:id/operational-data  POST /api/operational-data
@@ -240,7 +241,7 @@ All routes except `/api/health`, `/api/auth/register` and `/api/auth/login` requ
 | 2 | Expo Go opens | `npm run expo:start`, scan QR |
 | 3 | Register / login | Login screen, then create account |
 | 4 | Empty dashboard | Dashboard shows `No data available yet.` |
-| 5 | Create machine | Machines -> `+ Add Machine` |
+| 5 | Open compressor | Machines tab shows the single seeded compressor CMP-001 |
 | 6 | Persistence | Close and reopen the app; machine still listed |
 | 7 | Historical maintenance | Machine detail -> Maintenance history |
 | 8 | Create case | Cases -> `+ Create maintenance case` |

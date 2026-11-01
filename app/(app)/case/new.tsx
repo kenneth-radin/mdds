@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   Button,
   Card,
@@ -17,7 +17,6 @@ import { Machine, MaintenanceCase } from '../../../lib/types';
 import { splitCsv } from '../../../lib/format';
 
 export default function NewCaseScreen() {
-  const router = useRouter();
   const params = useLocalSearchParams<{ machine?: string }>();
   const [machines, setMachines] = useState<Machine[]>([]);
   const [selected, setSelected] = useState<Machine | null>(null);
@@ -86,8 +85,8 @@ export default function NewCaseScreen() {
         <EmptyState
           icon="construct-outline"
           title="No machines registered yet"
-          message="Add a machine and its historical records before creating a case."
-          action={{ title: 'Add a machine', onPress: () => router.push('/(app)/machine/new') }}
+          message="The compressor CMP-001 is seeded by the backend on startup. Create a case for it below."
+          action={{ title: 'Open compressor', onPress: () => router.push('/(app)/(tabs)/machines') }}
         />
       ) : (
         <>

@@ -11,7 +11,7 @@ export default function MaintenancePage() {
   const [q, setQ] = useState('');
   const [type, setType] = useState('all');
   const [showAdd, setShowAdd] = useState(false);
-  const [m, setM] = useState({ equipmentId: '', maintenanceType: 'Scheduled Inspection', problem: '', action: '', partsReplaced: 'None', technician: 'John Doe', date: new Date().toISOString().slice(0, 10), downtimeHours: '1', notes: '' });
+  const [m, setM] = useState({ equipmentId: listEquipment()[0]?.equipmentId || '', maintenanceType: 'Scheduled Inspection', problem: '', action: '', partsReplaced: 'None', technician: 'John Doe', date: new Date().toISOString().slice(0, 10), downtimeHours: '1', notes: '' });
 
   const equipment = listEquipment();
   let recs = listMaintenance();

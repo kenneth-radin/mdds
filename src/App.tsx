@@ -2,8 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
-import EquipmentPage from './pages/EquipmentPage';
-import EquipmentDetailPage from './pages/EquipmentDetailPage';
 import LiveMonitoringPage from './pages/LiveMonitoringPage';
 import RecommendationsPage from './pages/RecommendationsPage';
 import MaintenancePage from './pages/MaintenancePage';
@@ -19,8 +17,6 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/equipment" element={<EquipmentPage />} />
-          <Route path="/equipment/:id" element={<EquipmentDetailPage />} />
           <Route path="/monitoring" element={<LiveMonitoringPage />} />
           <Route path="/recommendations" element={<RecommendationsPage />} />
           <Route path="/maintenance" element={<MaintenancePage />} />
