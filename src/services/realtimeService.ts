@@ -2,67 +2,155 @@ import { store } from './store';
 import { getLatestReading, getReadings, addReading } from './sensorService';
 import { generateSimulatedReading } from './simulatedSource';
 import { Equipment, SensorReading } from '../types';
+import { API_URL } from '../../lib/config';
 
 // ---------------------------------------------------------------------------
 // Real-time data service.
 //
-// Best fit for this stack: POLLLING via setInterval.
+// Supports TWO modes:
+//   1. SSE — connects to the Render backend stream and receives live sensor
+//      readings pushed from the server. Also posts simulated readings to
+//      POST /api/sensor-data so data flows.
+//   2. Polling fallback — local setInterval simulated feed into localStorage
+//      (used when the backend is unreachable or no API URL is set).
 //
-// Why polling here:
-//   - The UI currently stores readings in-memory (localStorage-backed) and is
-//     not wired to the backend REST API for sensor data. WebSockets would
-//     require a new dependency plus server + connection handling; SSE would
-//     require EventSource handling and a dev-server proxy. Polling matches the
-//     existing "simulated feed" loop, needs zero new dependencies, and keeps
-//     the app working offline.
-//   - The backend exposes SSE endpoints (/api/sensor-data/stream) and a
-//     POST /api/sensor-data ingestion endpoint. If/when the frontend is wired
-//     to a live backend, switch this loader to EventSource instead of
-//     setInterval and the app still benefits from the same service shape.
-//
-// The feed can be started/stopped from any component that needs live updates.
+// Public API shape stays the same regardless of mode.
 // ---------------------------------------------------------------------------
 
-/** Returns the single fixed compressor (the rest of the app now manages one machine). */
 export function getCompressor(): Equipment | undefined {
   return store.get().equipment[0];
 }
 
-/** Latest reading for the compressor, or undefined when no data exists yet. */
 export function latestReading(): SensorReading | undefined {
   const eq = getCompressor();
   if (!eq) return undefined;
   return getLatestReading(eq.equipmentId);
 }
 
-/** Recent history (default 60 readings) for charting/trend work. */
 export function history(limit = 60): SensorReading[] {
   const eq = getCompressor();
   if (!eq) return [];
   return getReadings(eq.equipmentId).slice(-limit);
 }
 
+let sseEventSource: EventSource | null = null;
 let feedInterval: number | null = null;
+let postInterval: number | null = null;
+let activeMode: 'sse' | 'polling' | 'none' = 'none';
 
-/**
- * Start the simulated feeding loop for the compressor.
- * Returns a cleanup function that stops the loop.
- */
+function connectSSE(intervalSeconds = 5): void {
+  const eq = getCompressor();
+  if (!eq) return;
+
+  const url = `${API_URL}/api/sensor-data/stream?machineId=${eq.equipmentId}`;
+  sseEventSource = new EventSource(url);
+
+  sseEventSource.onopen = () => {
+    activeMode = 'sse';
+    console.log('[realtime] SSE stream connected');
+  };
+
+  sseEventSource.onmessage = (event: MessageEvent) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.sample === 'SSE stream open') return;
+      if (data.temperature !== undefined && data.vibration !== undefined) {
+        const reading: SensorReading = {
+          id: data.id,
+          equipmentId: data.equipmentId || eq.equipmentId,
+          timestamp: (data.timestamp || '') as string,
+          temperature: data.temperature,
+          vibration: data.vibration,
+          voltage: data.voltage ?? 0,
+          current: data.current ?? 0,
+          operatingHours: data.operatingHours ?? 0,
+          observation: data.observation || 'Live backend feed',
+          source: 'live',
+        };
+        addReading(reading);
+      }
+    } catch {
+      // ignore malformed SSE events
+    }
+  };
+
+  sseEventSource.onerror = () => {
+    sseEventSource?.close();
+    sseEventSource = null;
+    activeMode = 'none';
+    console.warn('[realtime] SSE stream error, falling back to polling');
+    startPolling(intervalSeconds);
+  };
+
+  postInterval = window.setInterval(() => {
+    try {
+      const sample = generateSimulatedReading(eq);
+      void fetch(`${API_URL}/api/sensor-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          temperature: sample.temperature,
+          vibration: sample.vibration,
+          operatingHours: sample.operatingHours,
+          /* @ts-ignore */
+timestamp: sample.timestamp,
+          source: 'simulated',
+        }),
+      });
+    } catch {
+      // ignore POST failures
+    }
+  }, Math.max(2000, intervalSeconds * 1000));
+}
+
+function startPolling(intervalSeconds = 5): void {
+  activeMode = 'polling';
+  feedInterval = window.setInterval(() => {
+    const eq = getCompressor();
+    if (!eq) return;
+    try {
+      const sample = generateSimulatedReading(eq);
+      addReading({ ...sample, observation: 'Simulated real-time feed' });
+    } catch {
+      // ignore
+    }
+  }, Math.max(2000, intervalSeconds * 1000));
+}
+
 export function startFeed(intervalSeconds = 5): () => void {
+  stopFeed();
+
   const eq = getCompressor();
   if (!eq) return () => {};
 
-  feedInterval = window.setInterval(() => {
-    const sample = generateSimulatedReading(eq);
-    addReading({ ...sample, observation: 'Simulated real-time feed' });
-  }, Math.max(2000, intervalSeconds * 1000));
+  if (API_URL && API_URL !== 'http://localhost:4000') {
+    connectSSE(intervalSeconds);
+  } else {
+    startPolling(intervalSeconds);
+  }
 
   return () => stopFeed();
 }
 
 export function stopFeed(): void {
+  activeMode = 'none';
+
+  if (sseEventSource) {
+    sseEventSource.close();
+    sseEventSource = null;
+  }
+
   if (feedInterval !== null) {
     clearInterval(feedInterval);
     feedInterval = null;
   }
+
+  if (postInterval !== null) {
+    clearInterval(postInterval);
+    postInterval = null;
+  }
+}
+
+export function getFeedMode(): 'sse' | 'polling' | 'none' {
+  return activeMode;
 }
