@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, TriangleAlert, TrendingUp, AlertCircle } from 'lucide-react';
+import { Activity, TriangleAlert, TrendingUp, AlertCircle, Signal, WifiOff } from 'lucide-react';
 import { useAppState } from '../hooks/useAppState';
 import { PageHeader, Card, StatCard, EmptyState } from '../components/ui';
 import { ConditionGauge, TrendLineChart } from '../components/charts';
-import { getCompressor, latestReading, history } from '../services/realtimeService';
+import { getCompressor, latestReading, history, getFeedMode } from '../services/realtimeService';
 import { AnomalyAlert, Condition, Level } from '../types';
 import { classifyValue } from '../utils/calc';
 import { worstCondition } from '../utils/score';
