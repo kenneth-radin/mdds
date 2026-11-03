@@ -47,3 +47,27 @@ export function round(value: number, digits = 2): number {
   const factor = Math.pow(10, digits);
   return Math.round(value * factor) / factor;
 }
+
+
+export type Level = 'normal' | 'warning' | 'critical';
+
+export interface ThresholdConfig {
+  temperature: number;
+  vibration: number;
+}
+
+export const DEFAULT_THRESHOLDS: ThresholdConfig = {
+  temperature: 85,
+  vibration: 2,
+};
+
+export function classifyValue(threshold: number, value: number): Level {
+  if (value >= threshold * 1.2) return 'critical';
+  if (value >= threshold * 0.8) return 'warning';
+  return 'normal';
+}
+
+export function worstCondition(levels: Level[]): Level {
+  const priority: Record<Level, number> = { critical: 3, warning: 2, normal: 1 };
+  return levels.reduce((a, b) => (priority[a] > priority[b] ? a : b), 'normal');
+}
