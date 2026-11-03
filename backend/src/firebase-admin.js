@@ -1,10 +1,14 @@
 let admin;
 try {
   admin = require("firebase-admin");
-} catch {
+} catch (error) {
   // firebase-admin is not installed in this environment; Firebase sync is
   // unavailable until the package is added and FIREBASE_* credentials are set.
   admin = null;
+  console.error(
+    "[firebase-admin] require failed — Firebase sync disabled:",
+    error instanceof Error ? error.message : error
+  );
 }
 
 // Load credentials from environment variables
