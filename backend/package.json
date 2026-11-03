@@ -6,7 +6,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json && cp src/firebase-admin.js dist/firebase-admin.js && cp src/services/syncService.js dist/services/syncService.js",
+    "build": "tsc -p tsconfig.json && Copy-Item src/firebase-admin.js dist/firebase-admin.js -Force && Copy-Item src/services/syncService.js dist/services/syncService.js",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "train:ml": "tsx src/services/ml/trainBenchmark.ts",
