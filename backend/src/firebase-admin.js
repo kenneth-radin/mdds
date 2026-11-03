@@ -37,6 +37,10 @@ const initialized = admin !== null && missing.length === 0;
 console.log(
   "[firebase-admin] admin=" +
     (admin !== null ? "loaded" : "null") +
+    ", keys=" +
+    (admin !== null ? Object.keys(admin).join(",") : "none") +
+    ", credential=" +
+    (admin !== null && admin.credential ? "present" : "undefined") +
     ", missing=" +
     missing.join(", ") +
     ", initialized=" +
