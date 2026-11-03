@@ -1,4 +1,11 @@
-const admin = require("firebase-admin");
+let admin;
+try {
+  admin = require("firebase-admin");
+} catch {
+  // firebase-admin is not installed in this environment; Firebase sync is
+  // unavailable until the package is added and FIREBASE_* credentials are set.
+  admin = null;
+}
 
 // Load credentials from environment variables
 const serviceAccount = {
@@ -21,7 +28,7 @@ const serviceAccount = {
 // to enable the real-time Firebase sync path.
 const requiredEnvVars = ["FIREBASE_PRIVATE_KEY"];
 const missing = requiredEnvVars.filter((v) => !process.env[v]);
-const initialized = missing.length === 0;
+const initialized = admin !== null && missing.length === 0;
 
 if (!initialized) {
   console.warn(

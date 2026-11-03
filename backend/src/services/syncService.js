@@ -1,4 +1,10 @@
-const admin = require("../firebase-admin");
+let admin;
+try {
+  admin = require("../firebase-admin");
+} catch {
+  // firebase-admin is not installed; Firebase sync is unavailable.
+  admin = { initialized: false, db: null };
+}
 const mongoose = require("mongoose");
 const SensorReading = require("../models/SensorReading");
 
