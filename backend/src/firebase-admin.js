@@ -62,7 +62,7 @@ let initError = null;
 if (initialized) {
   try {
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+      credential: admin.cert(serviceAccount),
       databaseURL: process.env.FIREBASE_DATABASE_URL || "https://mdss-47750.firebaseio.com",
     });
   } catch (error) {
