@@ -52,14 +52,25 @@ if (!initialized) {
 }
 
 // Initialize Firebase Admin only when credentials are present.
+// Wrapped in try/catch so the module always exports successfully even if
+// initializeApp() throws (e.g. app already initialized elsewhere).
+let initError = null;
 if (initialized) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: process.env.FIREBASE_DATABASE_URL || "https://mdss-47750.firebaseio.com",
-  });
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      databaseURL: process.env.FIREBASE_DATABASE_URL || "https://mdss-47750.firebaseio.com",
+    });
+  } catch (error) {
+    initError = error;
+    console.error(
+      "[firebase-admin] initializeApp failed — Firebase sync disabled:",
+      error instanceof Error ? error.message : error
+    );
+  }
 }
 
-const db = initialized ? admin.database() : null;
-const firestore = initialized ? admin.firestore() : null;
+const db = initialized && !initError ? admin.database() : null;
+const firestore = initialized && !initError ? admin.firestore() : null;
 
-module.exports = { admin, db, firestore, initialized };
+module.exports = { admin, db, firestore, initialized: initialized && !initError };
