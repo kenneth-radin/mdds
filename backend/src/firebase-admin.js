@@ -62,4 +62,4 @@ if (initialized) {
 const db = initialized ? admin.database() : null;
 const firestore = initialized ? admin.firestore() : null;
 
-module.exports = { admin, db, firestore };
+module.exports = { admin, db, firestore, initialized };

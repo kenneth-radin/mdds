@@ -10,6 +10,7 @@ const SensorReading = require("../models/SensorReading");
 
 // Sync latest reading to Firebase Realtime DB
 async function syncLatestReading() {
+  console.log('[sync] admin.initialized=' + admin.initialized);
   if (!admin.initialized) {
     console.log('[sync] Firebase not configured; skipping syncLatestReading');
     return;
@@ -37,6 +38,7 @@ async function syncLatestReading() {
 
 // Sync all recent readings (last 24 hours)
 async function syncRecentReadings() {
+  console.log('[sync] admin.initialized=' + admin.initialized);
   if (!admin.initialized) {
     console.log('[sync] Firebase not configured; skipping syncRecentReadings');
     return;
