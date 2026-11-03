@@ -34,6 +34,15 @@ const requiredEnvVars = ["FIREBASE_PRIVATE_KEY", "FIREBASE_CLIENT_EMAIL", "FIREB
 const missing = requiredEnvVars.filter((v) => !process.env[v]);
 const initialized = admin !== null && missing.length === 0;
 
+console.log(
+  "[firebase-admin] admin=" +
+    (admin !== null ? "loaded" : "null") +
+    ", missing=" +
+    missing.join(", ") +
+    ", initialized=" +
+    initialized
+);
+
 if (!initialized) {
   console.warn(
     "Firebase admin not configured in this environment (missing: " +
