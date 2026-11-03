@@ -12,7 +12,7 @@ const serviceAccount = {
   type: "service_account",
   project_id: process.env.FIREBASE_PROJECT_ID || "mdss-47750",
   private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID || "929905540a995b12fa78c3a45e951c73453608a0",
-  private_key: process.env.FIREBASE_PRIVATE_KEY || "",
+  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n") || "",
   client_email: process.env.FIREBASE_CLIENT_EMAIL || "firebase-adminsdk-fbsvc@mdss-47750.iam.gserviceaccount.com",
   client_id: process.env.FIREBASE_CLIENT_ID || "110198409460767930931",
   auth_uri: "https://accounts.google.com/o/oauth2/auth",
@@ -26,7 +26,7 @@ const serviceAccount = {
 // configured. The sync service reads `initialized` to know whether it may
 // push sensor readings. Set FIREBASE_PRIVATE_KEY (and friends) in backend/.env
 // to enable the real-time Firebase sync path.
-const requiredEnvVars = ["FIREBASE_PRIVATE_KEY"];
+const requiredEnvVars = ["FIREBASE_PRIVATE_KEY", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PROJECT_ID"];
 const missing = requiredEnvVars.filter((v) => !process.env[v]);
 const initialized = admin !== null && missing.length === 0;
 

@@ -1,21 +1,26 @@
 import { createApp } from './app';
-import { connectDatabase, disconnectDatabase } from './config/db';
+import { connectDatabase, disconnectDatabase, isDatabaseConnected } from './config/db';
 import { env } from './config/env';
 import { ensureDefaultMachine } from './config/seed';
 // @ts-ignore
 import syncService from './services/syncService';
 
 async function main(): Promise<void> {
+  // Attempt DB connection, but never let a DB failure prevent the HTTP server
+  // from starting — Render needs an open port, and the health endpoint should
+  // still respond even when MongoDB is temporarily unreachable.
   await connectDatabase();
-  // Ensure the DB starts with the single fixed compressor (and an attribution
-  // user for createdBy). Remove POST /machines so it can never grow beyond one.
-  await ensureDefaultMachine();
 
-  // Real-time Firebase sync of the latest and recent sensor readings.
-  // Best-effort: only active once FIREBASE_* credentials are configured in
-  // backend/.env (firebase-admin.js exports `initialized` for that check).
-  syncService.syncLatestReading();
-  syncService.syncRecentReadings();
+  if (isDatabaseConnected()) {
+    // Only seed / sync when the database is actually reachable.
+    await ensureDefaultMachine();
+    syncService.syncLatestReading();
+    syncService.syncRecentReadings();
+  } else {
+    console.warn(
+      '[server] MongoDB is unavailable — database-backed endpoints will return errors until connectivity is restored.'
+    );
+  }
 
   const app = createApp();
   // 0.0.0.0 so a physical phone on the same network can reach the API.
