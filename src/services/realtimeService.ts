@@ -3,6 +3,9 @@ import { getLatestReading, getReadings, addReading } from './sensorService';
 import { generateSimulatedReading } from './simulatedSource';
 import { Equipment, SensorReading } from '../types';
 import { API_URL } from '../../lib/config';
+// @ts-ignore - the firebaseConfig.js module deliberately re-exports a
+// defensive, dynamically-loaded getFirebase(); its types are best-effort.
+import { getFirebase } from '../firebaseConfig';
 
 // ---------------------------------------------------------------------------
 // Real-time data service.
@@ -37,6 +40,9 @@ let sseEventSource: EventSource | null = null;
 let feedInterval: number | null = null;
 let postInterval: number | null = null;
 let activeMode: 'sse' | 'polling' | 'none' = 'none';
+let firebaseUnsubscribe: (() => void) | null = null;
+const seenFirebaseTimestamps = new Set<string>();
+let firebaseCleanup: (() => void) | undefined;
 
 function connectSSE(intervalSeconds = 5): void {
   const eq = getCompressor();
@@ -123,13 +129,23 @@ export function startFeed(intervalSeconds = 5): () => void {
   const eq = getCompressor();
   if (!eq) return () => {};
 
+  // Kick off the optional Firebase live feed (fire-and-forget). It only
+  // activates once the optional firebase SDK is installed, which keeps the
+  // main feed path synchronous.
+  void startFirebaseFeed().then((cleanup) => {
+    firebaseCleanup = cleanup;
+  });
+
   if (API_URL && API_URL !== 'http://localhost:4000') {
     connectSSE(intervalSeconds);
   } else {
     startPolling(intervalSeconds);
   }
 
-  return () => stopFeed();
+  return () => {
+    if (firebaseCleanup) firebaseCleanup();
+    stopFeed();
+  };
 }
 
 export function stopFeed(): void {
@@ -149,6 +165,50 @@ export function stopFeed(): void {
     clearInterval(postInterval);
     postInterval = null;
   }
+
+  if (firebaseUnsubscribe) {
+    firebaseUnsubscribe();
+    firebaseUnsubscribe = null;
+  }
+}
+
+export async function startFirebaseFeed(): Promise<(() => void) | undefined> {
+  const { database } = await getFirebase();
+  if (!database) return undefined;
+
+  const readingsRef = database.ref('sensorReadings').limitToLast(100);
+
+  firebaseUnsubscribe = readingsRef.on('value', (snapshot: any) => {
+    snapshot.forEach((child: any) => {
+      const data = child.val();
+      if (data === null || data.temperature === undefined || data.vibration === undefined) return;
+      const timestamp = String(data.timestamp ?? Date.now());
+      if (seenFirebaseTimestamps.has(timestamp)) return;
+      seenFirebaseTimestamps.add(timestamp);
+
+      try {
+        addReading({
+          equipmentId: String(data.equipmentId ?? 'CMP-001'),
+          temperature: Number(data.temperature),
+          vibration: Number(data.vibration),
+          voltage: 0,
+          current: 0,
+          operatingHours: data.operatingHours ? Number(data.operatingHours) : 0,
+          timestamp,
+          source: data.source ?? 'firebase',
+        });
+      } catch {
+        // ignore malformed entries
+      }
+    });
+  });
+
+  return () => {
+    if (firebaseUnsubscribe) {
+      firebaseUnsubscribe();
+      firebaseUnsubscribe = null;
+    }
+  };
 }
 
 export function getFeedMode(): 'sse' | 'polling' | 'none' {

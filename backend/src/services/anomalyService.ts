@@ -1,6 +1,6 @@
-import { SensorReading, ISensorReading } from '../models/SensorReading';
+﻿import { SensorReading, ISensorReading } from '../models/SensorReading';
 import { ZScoreConfig, MLService, MlAnomalyOutput } from '../services/ml';
-import { classifyValue, DEFAULT_THRESHOLDS, worstCondition } from '../types';
+import { classifyValue, DEFAULT_THRESHOLDS, worstCondition } from '../utils/helpers';
 
 export class AnomalyDetector {
   private mlService: MLService;
@@ -19,7 +19,12 @@ export class AnomalyDetector {
     reading: ISensorReading,
     history: ISensorReading[],
     thresholds: typeof DEFAULT_THRESHOLDS
-  ): import('../types').AnomalyResult & {
+  ): {} & {
+    anomaly: boolean;
+    severity: 'normal' | 'warning' | 'critical';
+    parameter?: 'temperature' | 'vibration';
+    reason?: string;
+    suggestion?: string;
     model: 'z-score' | 'linear-regression' | 'rule-based';
     score?: number;
     confidence?: number;
@@ -47,7 +52,13 @@ export class AnomalyDetector {
     );
 
     // Build the result, merging ML output with threshold-based classification
-    const baseResult: import('../types').AnomalyResult = {
+    const baseResult: {} & {
+      anomaly: boolean;
+      severity: 'normal' | 'warning' | 'critical';
+      parameter?: 'temperature' | 'vibration';
+      reason?: string;
+      suggestion?: string;
+    } = {
       anomaly: mlOutput.anomaly,
       severity: mlOutput.severity,
       parameter: mlOutput.parameter,
@@ -61,10 +72,6 @@ export class AnomalyDetector {
       model: mlOutput.model,
       score: mlOutput.score,
       confidence: mlOutput.confidence,
-    } as import('../types').AnomalyResult & {
-      model: 'z-score' | 'linear-regression' | 'rule-based';
-      score?: number;
-      confidence?: number;
     };
 
     // Add trend info if available
@@ -88,8 +95,8 @@ export class AnomalyDetector {
           anomaly: true,
           severity: 'critical',
           parameter: 'temperature',
-          reason: `Temperature ${reading.temperature.toFixed(1)}°C is in the critical band.`,
-          suggestion: 'Inspect cooling system immediately — temperature is critical.',
+          reason: `Temperature ${reading.temperature.toFixed(1)}Â°C is in the critical band.`,
+          suggestion: 'Inspect cooling system immediately â€” temperature is critical.',
           model: 'rule-based',
         };
       } else if (worstLevel === 'warning') {
@@ -97,7 +104,7 @@ export class AnomalyDetector {
           anomaly: true,
           severity: 'warning',
           parameter: reading.temperature > reading.vibration ? 'temperature' : 'vibration',
-          reason: `${reading.temperature.toFixed(1)}°C or ${reading.vibration.toFixed(1)}mm/s is in the warning band.`,
+          reason: `${reading.temperature.toFixed(1)}Â°C or ${reading.vibration.toFixed(1)}mm/s is in the warning band.`,
           suggestion: worstLevel === 'warning'
             ? 'Inspect cooling system and check bearing wear.'
             : 'Continue routine monitoring.',
