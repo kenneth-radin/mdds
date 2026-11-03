@@ -6,7 +6,7 @@ try {
   // unavailable until the package is added and FIREBASE_* credentials are set.
   admin = null;
   console.error(
-    "[firebase-admin] require failed — Firebase sync disabled:",
+    "[firebase-admin] require failed ï¿½ Firebase sync disabled:",
     error instanceof Error ? error.message : error
   );
 }
@@ -51,6 +51,6 @@ if (initialized) {
 }
 
 const db = initialized ? admin.database() : null;
-const firestore = initialized ? admin.firestore : null;
+const firestore = initialized ? admin.firestore() : null;
 
 module.exports = { admin, db, firestore };
