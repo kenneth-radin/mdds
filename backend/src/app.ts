@@ -13,6 +13,8 @@ import reportRoutes from './routes/report.routes';
 import mlRoutes from './routes/ml.routes';
 import { errorHandler, notFound } from './middleware/error';
 import { hydrateFromDisk, listCards } from './services/ml/modelRegistry';
+import fs from 'fs';
+import path from 'path';
 import mongoose from 'mongoose';
 
 export function createApp() {
@@ -32,6 +34,28 @@ export function createApp() {
       database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
       models: listCards().length,
       time: new Date().toISOString()
+    });
+
+
+
+
+
+
+
+  });  // === Debug endpoints (temporary — remove after diagnosis) ===
+  app.get('/api/_debug/source', (req, res) => {
+    try {
+      const filePath = path.join(__dirname, 'routes', 'sensor.routes.js');
+      const content = fs.readFileSync(filePath, 'utf8');
+      res.type('text/plain').send(content);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+  app.get('/api/_debug/version', (req, res) => {
+    res.json({
+      commit: process.env.RENDER_GIT_COMMIT || 'unknown',
+      deployedAt: process.env.RENDER_INSTANCE_ID || 'unknown',
     });
   });
 
