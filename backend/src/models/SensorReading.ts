@@ -25,7 +25,7 @@ const sensorReadingSchema = new Schema<ISensorReading>(
     vibration: { type: Number, required: true, min: 0, max: 20 },
     operatingHours: { type: Number, required: true, min: 0, default: 0 },
     source: { type: String, default: 'manual', trim: true },
-    syncedToFirebase: { type: Boolean, default: true, index: true }
+    syncedToFirebase: { type: Boolean, default: false, index: true }
   },
   { timestamps: true }
 );

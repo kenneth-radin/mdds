@@ -16,7 +16,7 @@ async function syncLatestReading() {
     return;
   }
   try {
-    const latest = await SensorReading.findOne({})
+    const latest = await SensorReading.findOne({ syncedToFirebase: { $ne: true } })
       .sort({ date: -1 })
       .lean();
     
@@ -45,8 +45,10 @@ async function syncRecentReadings() {
   }
   try {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const readings = await SensorReading.find({ date: { $gte: twentyFourHoursAgo } })
-      .sort({ date: -1 });
+    const readings = await SensorReading.find({
+      date: { $gte: twentyFourHoursAgo },
+      syncedToFirebase: { $ne: true }
+    }).sort({ date: -1 });
     
     const ref = admin.db.ref("sensorReadingsHistory");
     
@@ -58,6 +60,7 @@ async function syncRecentReadings() {
         equipmentId: "CMP-001",
         source: "mongodb"
       });
+      await SensorReading.updateOne({ _id: reading._id }, { syncedToFirebase: true });
     }
     console.log(`Synced ${readings.length} readings to Firebase`);
   } catch (error) {
