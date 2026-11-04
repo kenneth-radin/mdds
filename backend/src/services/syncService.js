@@ -6,7 +6,7 @@ try {
   admin = { initialized: false, db: null };
 }
 const mongoose = require("mongoose");
-const SensorReading = require("../models/SensorReading");
+const { SensorReading } = require("../models/SensorReading");
 
 // Sync latest reading to Firebase Realtime DB
 async function syncLatestReading() {

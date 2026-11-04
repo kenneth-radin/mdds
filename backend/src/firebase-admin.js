@@ -1,6 +1,8 @@
 let admin;
 try {
   admin = require("firebase-admin");
+  require("firebase-admin/database");
+  require("firebase-admin/firestore");
 } catch (error) {
   // firebase-admin is not installed in this environment; Firebase sync is
   // unavailable until the package is added and FIREBASE_* credentials are set.
