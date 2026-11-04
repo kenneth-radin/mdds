@@ -12,9 +12,6 @@ import { db } from '../firebase-admin';
 
 const route = Router();
 
-route.use((req, res, next) => {
-  requireAuth(req, res, next).catch(next);
-});
 
 const singleReadingSchema = z.object({
   temperature: z.number().min(-50).max(150),
@@ -47,14 +44,14 @@ function requireDeviceKey(req: import('express').Request, res: import('express')
   next();
 }
 
-route.get('/latest', asyncHandler(async (_req, res) => {
+route.get('/latest', requireAuth, asyncHandler(async (_req, res) => {
   const reading = await SensorReading.findOne({ machine: defaultMachineId })
     .sort({ date: -1 })
     .lean() as ISensorReading | null;
   res.json(reading ? singleReadingSchema.parse(reading) : null);
 }));
 
-route.get('/latest-by-machine', asyncHandler(async (req, res) => {
+route.get('/latest-by-machine', requireAuth, asyncHandler(async (req, res) => {
   const machineId = req.params.machineId || 'CMP-001';
   const reading = await SensorReading.findOne({ machine: machineId })
     .sort({ date: -1 })
@@ -62,7 +59,7 @@ route.get('/latest-by-machine', asyncHandler(async (req, res) => {
   res.json(reading ? singleReadingSchema.parse(reading) : null);
 }));
 
-route.get('/history', asyncHandler(async (req, res) => {
+route.get('/history', requireAuth, asyncHandler(async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000);
   const readings = await SensorReading.find({ machine: defaultMachineId })
     .sort({ date: -1 })
@@ -71,7 +68,7 @@ route.get('/history', asyncHandler(async (req, res) => {
   res.json(readings.map(r => singleReadingSchema.parse(r)));
 }));
 
-route.get('/stream', asyncHandler(async (_req, res) => {
+route.get('/stream', requireAuth, asyncHandler(async (_req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -84,7 +81,7 @@ route.get('/stream', asyncHandler(async (_req, res) => {
   setTimeout(() => res.end(), 5000);
 }));
 
-route.post('/data', validateBody(batchReadingSchema), asyncHandler(async (req, res) => {
+route.post('/data', requireAuth, validateBody(batchReadingSchema), asyncHandler(async (req, res) => {
   const body = req.body;
   const readings: Array<{
     temperature: number;
@@ -123,7 +120,7 @@ route.post('/data', validateBody(batchReadingSchema), asyncHandler(async (req, r
   });
 }));
 
-route.post('/test', asyncHandler(async (req, res) => {
+route.post('/test', requireAuth, asyncHandler(async (req, res) => {
   const body = req.body || {};
   const machineDoc = await Machine.findOne({ machineId: defaultMachineId });
   const machine = machineDoc?._id;
