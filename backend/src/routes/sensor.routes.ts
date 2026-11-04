@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { ISensorReading } from '../models/SensorReading';
 import { SensorReading } from '../models/SensorReading';
+import { Machine } from '../models/Machine';
 import { requireAuth } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { asyncHandler } from '../middleware/error';
@@ -72,9 +73,11 @@ route.post('/data', validateBody(batchReadingSchema), asyncHandler(async (req, r
     source?: string;
   }> = Array.isArray(body.readings) ? body.readings : [body];
   
+  const machineDoc = await Machine.findOne({ machineId: defaultMachineId });
+  const machine = machineDoc?._id;
+
   const results = await Promise.allSettled(
     readings.map(async (item) => {
-      const machine = defaultMachineId;
       const reading = new SensorReading({
         machine,
         temperature: item.temperature,
@@ -101,8 +104,9 @@ route.post('/data', validateBody(batchReadingSchema), asyncHandler(async (req, r
 
 route.post('/test', asyncHandler(async (req, res) => {
   const body = req.body || {};
+  const machineDoc = await Machine.findOne({ machineId: defaultMachineId });
+  const machine = machineDoc?._id;
   const reading = new SensorReading({
-    machine: defaultMachineId,
     temperature: body.temperature ?? 0,
     vibration: body.vibration ?? 0,
     operatingHours: body.operatingHours ?? 0,
