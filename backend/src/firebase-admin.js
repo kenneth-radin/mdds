@@ -74,7 +74,14 @@ if (initialized) {
   }
 }
 
-const db = initialized && !initError ? admin.database() : null;
-const firestore = initialized && !initError ? admin.firestore() : null;
+console.log("[firebase-admin] post-init check: initError=" + (initError ? initError.message || String(initError) : "null") + ", final exported initialized=" + (initialized && !initError));
+
+let db = null, firestore = null;
+try {
+  db = initialized && !initError ? admin.database() : null;
+  firestore = initialized && !initError ? admin.firestore() : null;
+} catch (error) {
+  console.error("[firebase-admin] database()/firestore() call failed:", error instanceof Error ? error.message : error);
+}
 
 module.exports = { admin, db, firestore, initialized: initialized && !initError };
