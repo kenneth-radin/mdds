@@ -12,6 +12,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <DHT.h>
 
 // ---------------------------------------------------------------------------
 // Wi-Fi credentials
@@ -29,10 +30,16 @@ const char* serverUrl = "https://mdds.onrender.com/api/devices/readings";
 #define DEVICE_INGEST_KEY "REPLACE_WITH_DEVICE_KEY"
 
 // ---------------------------------------------------------------------------
-// Sensor pins (adjust to your wiring)
+// DHT11 sensor
 // ---------------------------------------------------------------------------
-const int TEMPERATURE_PIN = 34;   // ADC1_CH6 on ESP32
-const int VIBRATION_PIN   = 35;   // ADC1_CH7 on ESP32
+#define DHT_PIN      4   // GPIO4 (adjust to your wiring)
+#define DHT_TYPE     DHT11
+DHT dht(DHT_PIN, DHT_TYPE);
+
+// ---------------------------------------------------------------------------
+// Vibration sensor (analog, legit)
+// ---------------------------------------------------------------------------
+const int VIBRATION_PIN = 35;   // ADC1_CH7 on ESP32
 
 // ---------------------------------------------------------------------------
 // Timing
@@ -42,7 +49,7 @@ const unsigned long POST_INTERVAL_MS = 5000;  // 5 seconds
 void setup() {
   Serial.begin(115200);
 
-  pinMode(TEMPERATURE_PIN, INPUT);
+  dht.begin();
   pinMode(VIBRATION_PIN, INPUT);
 
   WiFi.begin(ssid, password);
@@ -64,14 +71,17 @@ void loop() {
     return;
   }
 
-  // Read raw ADC values (0–4095 on ESP32)
-  int tempRaw   = analogRead(TEMPERATURE_PIN);
-  int vibRaw    = analogRead(VIBRATION_PIN);
+  // Read temperature from real DHT11 sensor
+  float temperature = dht.readTemperature();
+  if (isnan(temperature)) {
+    Serial.println("Failed to read from DHT sensor, skipping this cycle");
+    delay(POST_INTERVAL_MS);
+    return;
+  }
 
-  // Map raw ADC to physical ranges.
-  // Temperature: 20–40 °C, Vibration: 0–20 mm/s (matches backend validation).
-  float temperature = map(tempRaw, 0, 4095, 20, 40);
-  float vibration   = map(vibRaw, 0, 4095, 0, 20);
+  // Read vibration from analog sensor (0–4095 on ESP32)
+  int vibRaw = analogRead(VIBRATION_PIN);
+  float vibration = map(vibRaw, 0, 4095, 0, 20);
 
   if (HTTPClient http; http.begin(serverUrl)) {
     http.addHeader("Content-Type", "application/json");
@@ -81,7 +91,6 @@ void loop() {
     doc["temperature"]   = temperature;
     doc["vibration"]     = vibration;
     doc["operatingHours"] = 0;
-    doc["timestamp"]      = "";
     doc["source"]         = "device";
 
     String body;
