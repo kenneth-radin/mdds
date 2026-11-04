@@ -45,7 +45,12 @@ export function createApp() {
   });  // === Debug endpoints (temporary — remove after diagnosis) ===
   app.get('/api/_debug/source', (req, res) => {
     try {
-      const filePath = path.join(__dirname, 'routes', 'sensor.routes.js');
+      const file = (req.query.file as string) || 'routes/sensor.routes.js';
+      // basic safety: only allow .js files inside dist, no path traversal
+      if (file.includes('..') || !file.endsWith('.js')) {
+        return res.status(400).json({ error: 'invalid file param' });
+      }
+      const filePath = path.join(__dirname, file);
       const content = fs.readFileSync(filePath, 'utf8');
       res.type('text/plain').send(content);
     } catch (error) {
