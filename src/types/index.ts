@@ -5,7 +5,7 @@
 export type ParameterKey = 'temperature' | 'vibration' | 'voltage' | 'current';
 export type Level = 'normal' | 'warning' | 'critical';
 export type Condition = 'NORMAL' | 'WARNING' | 'CRITICAL' | 'OFFLINE';
-export type DataSource = 'simulated' | 'live';
+export type DataSource = 'simulated' | 'live' | 'device';
 export type TrendDirection = 'increasing' | 'decreasing' | 'stable';
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
 
