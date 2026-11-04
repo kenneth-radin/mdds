@@ -12,6 +12,7 @@ export interface ISensorReading extends Document {
   vibration: number;
   operatingHours: number;
   source: string;
+  syncedToFirebase: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,7 +24,8 @@ const sensorReadingSchema = new Schema<ISensorReading>(
     temperature: { type: Number, required: true, min: -50, max: 150 },
     vibration: { type: Number, required: true, min: 0, max: 20 },
     operatingHours: { type: Number, required: true, min: 0, default: 0 },
-    source: { type: String, default: 'manual', trim: true }
+    source: { type: String, default: 'manual', trim: true },
+    syncedToFirebase: { type: Boolean, default: true, index: true }
   },
   { timestamps: true }
 );

@@ -1,11 +1,14 @@
 ﻿import { Router } from 'express';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import { ISensorReading } from '../models/SensorReading';
 import { SensorReading } from '../models/SensorReading';
 import { Machine } from '../models/Machine';
 import { requireAuth } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { asyncHandler } from '../middleware/error';
+// @ts-ignore - firebase-admin.js is a JS module without type declarations
+import { db } from '../firebase-admin';
 
 const route = Router();
 
@@ -25,6 +28,24 @@ const batchReadingSchema = z.object({
 });
 
 const defaultMachineId = 'CMP-001';
+
+// Rate limit: 10 requests per second per IP to protect against a misbehaving device.
+const deviceIngestLimiter = rateLimit({
+  windowMs: 1000,
+  max: 10,
+  message: { error: 'Too many device ingestion requests. Slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Device-key auth: X-Device-Key header checked against DEVICE_INGEST_KEY env var.
+function requireDeviceKey(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) {
+  const key = req.headers['x-device-key'];
+  if (!key || key !== process.env.DEVICE_INGEST_KEY) {
+    return res.status(401).json({ error: 'Invalid or missing device key' });
+  }
+  next();
+}
 
 route.get('/latest', asyncHandler(async (_req, res) => {
   const reading = await SensorReading.findOne({ machine: defaultMachineId })
@@ -125,6 +146,65 @@ route.post('/test', asyncHandler(async (req, res) => {
       date: reading.date,
       source: reading.source
     })
+  });
+}));
+
+// Hardware ingestion endpoint: device-key authenticated, write-triggered Firebase sync.
+// Auth: X-Device-Key header vs DEVICE_INGEST_KEY env var (no JWT required).
+// Rate limit: 10 req/sec per IP.
+// On Firebase push failure: still returns 200 (reading saved, sync best-effort).
+const deviceReadingSchema = z.object({
+  temperature: z.number().min(-50).max(150),
+  vibration: z.number().min(0).max(20),
+  timestamp: z.string().datetime().optional(),
+  operatingHours: z.number().min(0).optional(),
+  source: z.string().optional()
+});
+
+route.post('/devices/readings', deviceIngestLimiter, requireDeviceKey, validateBody(deviceReadingSchema), asyncHandler(async (req, res) => {
+  const body = req.body as z.infer<typeof deviceReadingSchema>;
+  const machineDoc = await Machine.findOne({ machineId: defaultMachineId });
+  const machine = machineDoc?._id;
+
+  const reading = new SensorReading({
+    machine,
+    temperature: body.temperature,
+    vibration: body.vibration,
+    operatingHours: body.operatingHours ?? 0,
+    date: body.timestamp ? new Date(body.timestamp) : new Date(),
+    source: body.source || 'device',
+    syncedToFirebase: true // optimistic; set to false below if Firebase push fails
+  });
+  await reading.save();
+
+  let firebasePushOk = false;
+  if (db) {
+    try {
+      await db.ref("sensorReadings").push({
+        temperature: reading.temperature,
+        vibration: reading.vibration,
+        timestamp: reading.date.toISOString(),
+        equipmentId: "CMP-001",
+        source: reading.source
+      });
+      firebasePushOk = true;
+    } catch (error) {
+      console.error("[device-ingest] Firebase push failed, reading saved to Mongo only:", error instanceof Error ? error.message : error);
+    }
+  } else {
+    console.warn("[device-ingest] Firebase not initialized; reading saved to Mongo only.");
+  }
+
+  // Persist the sync outcome so we can query "how many readings failed to sync recently."
+  if (!firebasePushOk) {
+    reading.syncedToFirebase = false;
+    await reading.save();
+  }
+
+  res.status(200).json({
+    ok: true,
+    readingId: reading._id,
+    syncedToFirebase: firebasePushOk
   });
 }));
 
