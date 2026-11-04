@@ -42,32 +42,12 @@ export function createApp() {
 
 
 
-  });  // === Debug endpoints (temporary — remove after diagnosis) ===
-  app.get('/api/_debug/source', (req, res) => {
-    try {
-      const file = (req.query.file as string) || 'routes/sensor.routes.js';
-      // basic safety: only allow .js files inside dist, no path traversal
-      if (file.includes('..') || !file.endsWith('.js')) {
-        return res.status(400).json({ error: 'invalid file param' });
-      }
-      const filePath = path.join(__dirname, file);
-      const content = fs.readFileSync(filePath, 'utf8');
-      res.type('text/plain').send(content);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
-    }
-  });
-  app.get('/api/_debug/version', (req, res) => {
-    res.json({
-      commit: process.env.RENDER_GIT_COMMIT || 'unknown',
-      deployedAt: process.env.RENDER_INSTANCE_ID || 'unknown',
-    });
   });
 
   app.use('/api', authRoutes);
+  app.use('/api', sensorRoutes);
   app.use('/api', machineRoutes);
   app.use('/api', recordRoutes);
-  app.use('/api', sensorRoutes);
   app.use('/api', caseRoutes);
   app.use('/api', caseReviewRoutes);
   app.use('/api', testingRoutes);
