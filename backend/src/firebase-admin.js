@@ -1,8 +1,13 @@
 let admin;
+let getDatabase = null;
+let getFirestore = null;
+
 try {
   admin = require("firebase-admin");
-  require("firebase-admin/database");
-  require("firebase-admin/firestore");
+  const { getDatabase: gdb } = require("firebase-admin/database");
+  const { getFirestore: gfs } = require("firebase-admin/firestore");
+  getDatabase = gdb;
+  getFirestore = gfs;
 } catch (error) {
   // firebase-admin is not installed in this environment; Firebase sync is
   // unavailable until the package is added and FIREBASE_* credentials are set.
@@ -61,9 +66,10 @@ if (!initialized) {
 // Wrapped in try/catch so the module always exports successfully even if
 // initializeApp() throws (e.g. app already initialized elsewhere).
 let initError = null;
+let app = null;
 if (initialized) {
   try {
-    admin.initializeApp({
+    app = admin.initializeApp({
       credential: admin.cert(serviceAccount),
       databaseURL: process.env.FIREBASE_DATABASE_URL || "https://mdss-47750.firebaseio.com",
     });
@@ -80,8 +86,10 @@ console.log("[firebase-admin] post-init check: initError=" + (initError ? initEr
 
 let db = null, firestore = null;
 try {
-  db = initialized && !initError ? admin.database() : null;
-  firestore = initialized && !initError ? admin.firestore() : null;
+  if (initialized && !initError && app) {
+    db = getDatabase(app);
+    firestore = getFirestore(app);
+  }
 } catch (error) {
   console.error("[firebase-admin] database()/firestore() call failed:", error instanceof Error ? error.message : error);
 }
