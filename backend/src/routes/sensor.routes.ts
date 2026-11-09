@@ -44,14 +44,14 @@ function requireDeviceKey(req: import('express').Request, res: import('express')
   next();
 }
 
-route.get('/latest', asyncHandler(async (_req, res) => {
+route.get('/sensor-data/latest', asyncHandler(async (_req, res) => {
   const reading = await SensorReading.findOne({ machine: defaultMachineId })
     .sort({ date: -1 })
     .lean() as ISensorReading | null;
   res.json(reading ? singleReadingSchema.parse(reading) : null);
 }));
 
-route.get('/latest-by-machine', asyncHandler(async (req, res) => {
+route.get('/sensor-data/latest-by-machine', asyncHandler(async (req, res) => {
   const machineId = req.params.machineId || 'CMP-001';
   const reading = await SensorReading.findOne({ machine: machineId })
     .sort({ date: -1 })
@@ -59,7 +59,7 @@ route.get('/latest-by-machine', asyncHandler(async (req, res) => {
   res.json(reading ? singleReadingSchema.parse(reading) : null);
 }));
 
-route.get('/history', asyncHandler(async (req, res) => {
+route.get('/sensor-data/history', asyncHandler(async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1000);
   const readings = await SensorReading.find({ machine: defaultMachineId })
     .sort({ date: -1 })
@@ -68,7 +68,7 @@ route.get('/history', asyncHandler(async (req, res) => {
   res.json(readings.map(r => singleReadingSchema.parse(r)));
 }));
 
-route.get('/stream', asyncHandler(async (_req, res) => {
+route.get('/sensor-data/stream', asyncHandler(async (_req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
