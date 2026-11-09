@@ -286,3 +286,17 @@ export interface MlPredictResponse {
   limitations: string[];
   note: string;
 }
+
+/** Live sensor reading from the ESP32 device. */
+export interface SensorReading {
+  _id: string;
+  machine: string;
+  date: string;
+  temperature: number;
+  vibration: number;
+  operatingHours: number;
+  source: string;
+  syncedToFirebase: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
