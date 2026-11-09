@@ -3,7 +3,6 @@ import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 import { ISensorReading } from '../models/SensorReading';
 import { SensorReading } from '../models/SensorReading';
-import { Machine } from '../models/Machine';
 import { requireAuth } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { asyncHandler } from '../middleware/error';
@@ -25,6 +24,25 @@ const batchReadingSchema = z.object({
 });
 
 const defaultMachineId = 'CMP-001';
+
+// Time-range options for historical queries
+const HISTORICAL_RANGES = {
+  '1h': { hours: 1 },
+  '24h': { hours: 24 },
+  '7d': { days: 7 },
+  '30d': { days: 30 },
+} as const;
+
+type HistoricalRange = keyof typeof HISTORICAL_RANGES;
+
+function getRangeStart(range: HistoricalRange | undefined): Date | null {
+  if (!range || !(range in HISTORICAL_RANGES)) return null;
+  const spec = HISTORICAL_RANGES[range];
+  const now = new Date();
+  if (spec.hours !== undefined) return new Date(now.getTime() - spec.hours * 60 * 60 * 1000);
+  if (spec.days !== undefined) return new Date(now.getTime() - spec.days * 24 * 60 * 60 * 1000);
+  return null;
+}
 
 // Rate limit: 10 requests per second per IP to protect against a misbehaving device.
 const deviceIngestLimiter = rateLimit({
@@ -81,6 +99,30 @@ route.get('/sensor-data/stream', asyncHandler(async (_req, res) => {
   setTimeout(() => res.end(), 5000);
 }));
 
+// Historical sensor readings with time-range filtering
+route.get('/sensor-data/historical', asyncHandler(async (req, res) => {
+  const range = (req.query.range as HistoricalRange | undefined) ?? '24h';
+  const startDate = getRangeStart(range);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 5000);
+
+  const query: any = { machine: defaultMachineId };
+  if (startDate) {
+    query.date = { $gte: startDate };
+  }
+
+  const readings = await SensorReading.find(query)
+    .sort({ date: -1 })
+    .limit(limit)
+    .lean() as unknown as ISensorReading[];
+
+  res.json({
+    range,
+    startDate: startDate?.toISOString() ?? null,
+    count: readings.length,
+    readings: readings.map(r => singleReadingSchema.parse(r)),
+  });
+}));
+
 route.post('/data', requireAuth, validateBody(batchReadingSchema), asyncHandler(async (req, res) => {
   const body = req.body;
   const readings: Array<{
@@ -91,8 +133,7 @@ route.post('/data', requireAuth, validateBody(batchReadingSchema), asyncHandler(
     source?: string;
   }> = Array.isArray(body.readings) ? body.readings : [body];
   
-  const machineDoc = await Machine.findOne({ machineId: defaultMachineId });
-  const machine = machineDoc?._id;
+  const machine = defaultMachineId;
 
   const results = await Promise.allSettled(
     readings.map(async (item) => {
@@ -122,8 +163,7 @@ route.post('/data', requireAuth, validateBody(batchReadingSchema), asyncHandler(
 
 route.post('/test', requireAuth, asyncHandler(async (req, res) => {
   const body = req.body || {};
-  const machineDoc = await Machine.findOne({ machineId: defaultMachineId });
-  const machine = machineDoc?._id;
+  const machine = defaultMachineId;
   const reading = new SensorReading({
     temperature: body.temperature ?? 0,
     vibration: body.vibration ?? 0,
@@ -160,8 +200,7 @@ const deviceReadingSchema = z.object({
 
 route.post('/devices/readings', deviceIngestLimiter, requireDeviceKey, validateBody(deviceReadingSchema), asyncHandler(async (req, res) => {
   const body = req.body as z.infer<typeof deviceReadingSchema>;
-  const machineDoc = await Machine.findOne({ machineId: defaultMachineId });
-  const machine = machineDoc?._id;
+  const machine = defaultMachineId;
 
   const reading = new SensorReading({
     machine,

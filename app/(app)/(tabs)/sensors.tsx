@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import {
   Button,
@@ -21,10 +21,19 @@ import { SensorReading } from '../../../lib/types';
 const REFRESH_INTERVAL_MS = 5000;
 const STALE_THRESHOLD_MS = 30000;
 
+const RANGE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '1h', label: '1h' },
+  { value: '24h', label: '24h' },
+  { value: '7d', label: '7d' },
+];
+
 export default function SensorsScreen() {
   const [reading, setReading] = useState<SensorReading | null>(null);
   const [history, setHistory] = useState<SensorReading[]>([]);
+  const [historical, setHistorical] = useState<SensorReading[]>([]);
+  const [selectedRange, setSelectedRange] = useState<string>('24h');
   const [loading, setLoading] = useState(true);
+  const [historicalLoading, setHistoricalLoading] = useState(false);
   const [error, setError] = useState('');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -50,15 +59,33 @@ export default function SensorsScreen() {
     }
   }, []);
 
+  const loadHistorical = useCallback(async () => {
+    try {
+      setHistoricalLoading(true);
+      const data = await api.get<{
+        range: string;
+        startDate: string | null;
+        count: number;
+        readings: SensorReading[];
+      }>(`/api/sensor-data/historical?range=${selectedRange}&limit=500`);
+      setHistorical(data.readings);
+    } catch {
+      // Historical failure is non-fatal.
+    } finally {
+      setHistoricalLoading(false);
+    }
+  }, [selectedRange]);
+
   useFocusEffect(
     useCallback(() => {
       loadLatest();
       loadHistory();
+      loadHistorical();
       intervalRef.current = setInterval(loadLatest, REFRESH_INTERVAL_MS);
       return () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
       };
-    }, [loadLatest, loadHistory])
+    }, [loadLatest, loadHistory, loadHistorical])
   );
 
   const isOnline =
@@ -148,6 +175,60 @@ export default function SensorsScreen() {
             </View>
           </Card>
 
+          {/* Historical data view */}
+          <Card tone="muted">
+            <SectionHeader
+              title="Historical readings"
+              icon="list-outline"
+              action={
+                <View style={st.rangeSelector}>
+                  {RANGE_OPTIONS.map((opt) => (
+                    <Pressable
+                      key={opt.value}
+                      onPress={() => {
+                        setSelectedRange(opt.value);
+                        loadHistorical();
+                      }}
+                    >
+                      <Chip
+                        label={opt.label}
+                        tone={selectedRange === opt.value ? 'primary' : 'warning'}
+                      />
+                    </Pressable>
+                  ))}
+                </View>
+              }
+            />
+            {historicalLoading ? (
+              <Loading label="Loading history…" caption="Fetching historical readings." />
+            ) : historical.length === 0 ? (
+              <Muted style={st.noHistory}>
+                No historical data for the selected range. Ensure the ESP32 is sending readings.
+              </Muted>
+            ) : (
+              <View style={st.historyList}>
+                {historical.map((r) => (
+                  <View key={r._id} style={st.historyRow}>
+                    <Text style={st.historyTime}>
+                      {new Date(r.date).toLocaleString([], {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                    <View style={st.historyValues}>
+                      <Text style={st.historyLabel}>Temp:</Text>
+                      <Text style={st.historyValue}>{r.temperature.toFixed(1)} °C</Text>
+                      <Text style={st.historyLabel}>Vib:</Text>
+                      <Text style={st.historyValue}>{r.vibration.toFixed(1)}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </Card>
+
           <Button
             title="Refresh now"
             icon="refresh-outline"
@@ -212,5 +293,10 @@ const st = StyleSheet.create({
     color: theme.textMuted,
     textAlign: 'center',
     paddingVertical: theme.space.sm,
+  },
+  rangeSelector: {
+    flexDirection: 'row',
+    gap: theme.space.xs,
+    alignItems: 'center',
   },
 });

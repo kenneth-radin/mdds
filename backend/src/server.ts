@@ -3,7 +3,7 @@ import { connectDatabase, disconnectDatabase, isDatabaseConnected } from './conf
 import { env } from './config/env';
 import { ensureDefaultMachine } from './config/seed';
 // @ts-ignore
-import syncService from './services/syncService';
+import { startRollupScheduler } from './services/rollupService';
 
 async function main(): Promise<void> {
   // Attempt DB connection, but never let a DB failure prevent the HTTP server
@@ -14,8 +14,8 @@ async function main(): Promise<void> {
   if (isDatabaseConnected()) {
     // Only seed / sync when the database is actually reachable.
     await ensureDefaultMachine();
-    syncService.syncLatestReading();
-    syncService.syncRecentReadings();
+    // Start rollup scheduler for historical data aggregation
+    await startRollupScheduler();
   } else {
     console.warn(
       '[server] MongoDB is unavailable — database-backed endpoints will return errors until connectivity is restored.'
