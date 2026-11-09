@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 
 // Timestamped sensor readings for the single compressor. Only temperature and
 // vibration are retained here (voltage/current were dropped from the live feed).

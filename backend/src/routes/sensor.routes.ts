@@ -39,8 +39,12 @@ function getRangeStart(range: HistoricalRange | undefined): Date | null {
   if (!range || !(range in HISTORICAL_RANGES)) return null;
   const spec = HISTORICAL_RANGES[range];
   const now = new Date();
-  if (spec.hours !== undefined) return new Date(now.getTime() - spec.hours * 60 * 60 * 1000);
-  if (spec.days !== undefined) return new Date(now.getTime() - spec.days * 24 * 60 * 60 * 1000);
+  if ('hours' in spec) {
+    return new Date(now.getTime() - spec.hours * 60 * 60 * 1000);
+  }
+  if ('days' in spec) {
+    return new Date(now.getTime() - spec.days * 24 * 60 * 60 * 1000);
+  }
   return null;
 }
 
