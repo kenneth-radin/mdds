@@ -17,6 +17,7 @@
 // ---------------------------------------------------------------------------
 // Wi-Fi credentials
 // ---------------------------------------------------------------------------
+// TODO: Replace with your actual Wi-Fi credentials before flashing
 const char* ssid     = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
 
@@ -27,7 +28,7 @@ const char* serverUrl = "https://mdds.onrender.com/api/devices/readings";
 
 // Device ingest key — must match DEVICE_INGEST_KEY in backend/.env
 // Replace with your actual key before deploying.
-#define DEVICE_INGEST_KEY "REPLACE_WITH_DEVICE_KEY"
+#define DEVICE_INGEST_KEY "88092db1fd6244c36f2ddd9af1b512f8bff3d342b07f66e7b867c2b248fbf4d4"
 
 // ---------------------------------------------------------------------------
 // DHT11 sensor

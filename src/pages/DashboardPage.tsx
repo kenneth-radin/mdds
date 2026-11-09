@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, TriangleAlert, TrendingUp, AlertCircle, Signal, WifiOff } from 'lucide-react';
+import { Activity, TriangleAlert, TrendingUp, AlertCircle, Signal, WifiOff, Database, Zap } from 'lucide-react';
 import { useAppState } from '../hooks/useAppState';
 import { PageHeader, Card, StatCard, EmptyState } from '../components/ui';
 import { ConditionGauge, TrendLineChart } from '../components/charts';
@@ -96,6 +96,24 @@ export default function DashboardPage() {
           <div className="flex flex-col items-center gap-2">
             <ConditionGauge value={statusGauge[status]} label={statusLabel[status]} />
             <p className="text-xs text-slate-400">Latest sample</p>
+            {latest && (
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${
+                  latest.source === 'device'
+                    ? 'bg-green-50 text-green-700 border border-green-100'
+                    : latest.source === 'live'
+                    ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                    : latest.source === 'firebase'
+                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                    : latest.source === 'simulated'
+                    ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                    : 'bg-slate-50 text-slate-700 border border-slate-100'
+                }`}
+              >
+                <Database className="h-3 w-3" />
+                Source: {latest.source}
+              </span>
+            )}
           </div>
         </Card>
       </div>
