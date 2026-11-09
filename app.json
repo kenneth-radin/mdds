@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.plant.mdss",
-      "versionCode": 1
+      "versionCode": 14
     },
     "web": {
       "bundler": "metro"

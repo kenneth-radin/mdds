@@ -1,7 +1,7 @@
 {
   "name": "predictive-maintenance-system",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.4.0",
   "type": "module",
   "main": "expo-router/entry",
   "scripts": {
