@@ -25,7 +25,7 @@ async function syncLatestReading() {
       ref.push({
         temperature: latest.temperature,
         vibration: latest.vibration,
-        timestamp: latest.date.toISOString(),
+        timestamp: new Date(latest.date).toISOString(),
         equipmentId: "CMP-001",
         source: "mongodb"
       });
@@ -44,9 +44,9 @@ async function syncRecentReadings() {
     return;
   }
   try {
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
     const readings = await SensorReading.find({
-      date: { $gte: twentyFourHoursAgo },
+      $expr: { $gte: [{ $toLong: '$date' }, cutoffMs] },
       syncedToFirebase: { $ne: true }
     }).sort({ date: -1 });
     
@@ -56,7 +56,7 @@ async function syncRecentReadings() {
       await ref.push({
         temperature: reading.temperature,
         vibration: reading.vibration,
-        timestamp: reading.date.toISOString(),
+        timestamp: new Date(reading.date).toISOString(),
         equipmentId: "CMP-001",
         source: "mongodb"
       });
