@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Badge,
@@ -19,6 +19,7 @@ import {
   theme
 } from '../../../../components/ui';
 import { api, errorMessage } from '../../../../lib/api';
+import { machineStateApi, type MachineState } from '../../../../lib/api/machineState';
 import { Machine } from '../../../../lib/types';
 import { fmtDate, fmtNumber } from '../../../../lib/format';
 
@@ -35,6 +36,8 @@ export default function MachineDetailScreen() {
   const [counts, setCounts] = useState({ maintenanceRecords: 0, failureRecords: 0, operationalRecords: 0, cases: 0 });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentState, setCurrentState] = useState<{ state: MachineState; changedAt: number; changedBy: string | null; ageMs: number } | null>(null);
+  const [settingState, setSettingState] = useState(false);
   // Two-step delete confirmation rendered inline. The previous flow opened a
   // native Alert dialog, which some devices silently drop — the button then
   // looked dead. An on-screen confirmation always reacts to the first tap.
@@ -43,15 +46,21 @@ export default function MachineDetailScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setSettingState(true);
     setError('');
     try {
-      const result = await api.get<{ machine: Machine; counts: typeof counts }>(`/api/machines/${id}/summary`);
-      setMachine(result.machine);
-      setCounts(result.counts);
+      const [machineResult, stateResult] = await Promise.all([
+        api.get<{ machine: Machine; counts: typeof counts }>(`/api/machines/${id}/summary`),
+        machineStateApi.getCurrent(id)
+      ]);
+      setMachine(machineResult.machine);
+      setCounts(machineResult.counts);
+      setCurrentState(stateResult.current);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setLoading(false);
+      setSettingState(false);
     }
   }, [id]);
 
@@ -61,21 +70,49 @@ export default function MachineDetailScreen() {
     }, [load])
   );
 
+  const stateTone = (state: MachineState | null | undefined) => {
+    switch (state) {
+      case 'starting': return 'warning' as const;
+      case 'operating': return 'success' as const;
+      case 'stopped': return 'danger' as const;
+      default: return 'info' as const;
+    }
+  };
+
+  const stateLabel = (state: MachineState | null | undefined) => {
+    switch (state) {
+      case 'starting': return '🟡 Starting';
+      case 'operating': return '🟢 Operating';
+      case 'stopped': return '⚫ Stopped';
+      default: return '—';
+    }
+  };
+
+  const setState = async (state: MachineState) => {
+    setSettingState(true);
+    setError('');
+    try {
+      await machineStateApi.setState(id, state);
+      const result = await machineStateApi.getCurrent(id);
+      setCurrentState(result.current);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSettingState(false);
+    }
+  };
+
   const askDelete = () => {
-    console.log('[machine] delete requested: showing inline confirmation');
     setError('');
     setConfirmingDelete(true);
   };
 
   const confirmDelete = async () => {
-    console.log('[machine] delete confirmed: sending request');
     setDeleting(true);
     try {
       await api.del(`/api/machines/${id}`);
-      console.log('[machine] delete succeeded');
       router.replace('/(app)/(tabs)/machines');
     } catch (err) {
-      console.log('[machine] delete failed:', err);
       setError(errorMessage(err));
       setConfirmingDelete(false);
     } finally {
@@ -116,6 +153,19 @@ export default function MachineDetailScreen() {
           {error}
         </Notice>
       ) : null}
+
+      {/* Machine state — prominent live status badge */}
+      <View style={st.stateRow}>
+        <Text style={st.stateLabel}>Machine state</Text>
+        <Badge text={stateLabel(currentState?.state)} tone={stateTone(currentState?.state)} />
+      </View>
+
+      {/* Reminder banner: non-blocking nudge when stuck in Starting > 10 min */}
+      {currentState?.state === 'starting' && currentState.ageMs > 600000 && (
+        <Notice tone="warning" title="Machine has been in Starting state for 10+ minutes">
+          Update status to Operating if it is running stable now.
+        </Notice>
+      )}
 
       <View style={st.statRow}>
         <StatCard
@@ -191,6 +241,29 @@ export default function MachineDetailScreen() {
         </Collapse>
       </Card>
 
+      {/* Personnel state flagging — 3-button segmented control */}
+      <SectionHeader title="Machine state" icon="checkbox-outline" subtitle="Personnel taps to flag the current machine state." />
+      <View style={st.segmentedRow}>
+        <Button
+          title="🟡 Starting"
+          variant={currentState?.state === 'starting' ? 'primary' : 'secondary'}
+          onPress={() => setState('starting')}
+          disabled={settingState}
+        />
+        <Button
+          title="🟢 Operating"
+          variant={currentState?.state === 'operating' ? 'primary' : 'secondary'}
+          onPress={() => setState('operating')}
+          disabled={settingState}
+        />
+        <Button
+          title="⚫ Stopped"
+          variant={currentState?.state === 'stopped' ? 'primary' : 'secondary'}
+          onPress={() => setState('stopped')}
+          disabled={settingState}
+        />
+      </View>
+
       <SectionHeader
         title="History & analysis"
         icon="search-outline"
@@ -261,6 +334,24 @@ const st = StyleSheet.create({
   },
   deleteRow: {
     flexDirection: 'row',
+    marginTop: theme.space.sm
+  },
+  // Machine state status row (prominent live badge)
+  stateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: theme.space.sm,
+    marginBottom: theme.space.sm
+  },
+  stateLabel: {
+    ...theme.font.captionMedium,
+    color: theme.textSecondary
+  },
+  // Segmented control: 3 state buttons side by side
+  segmentedRow: {
+    flexDirection: 'row',
+    gap: theme.space.sm,
     marginTop: theme.space.sm
   }
 });
