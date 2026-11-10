@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.routes';
 import machineRoutes from './routes/machine.routes';
 import recordRoutes from './routes/record.routes';
 import sensorRoutes from './routes/sensor.routes';
+import machineStateRoutes from './routes/machineState.routes';
 import caseRoutes from './routes/case.routes';
 import caseReviewRoutes from './routes/caseReview.routes';
 import testingRoutes from './routes/testing.routes';
@@ -46,6 +47,7 @@ export function createApp() {
 
   app.use('/api', authRoutes);
   app.use('/api', sensorRoutes);
+  app.use('/api', machineStateRoutes);
   app.use('/api', machineRoutes);
   app.use('/api', recordRoutes);
   app.use('/api', caseRoutes);

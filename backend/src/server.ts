@@ -4,6 +4,7 @@ import { env } from './config/env';
 import { ensureDefaultMachine } from './config/seed';
 // @ts-ignore
 import { startRollupScheduler } from './services/rollupService';
+import { Alert } from './models/Alert';
 
 async function main(): Promise<void> {
   // Attempt DB connection, but never let a DB failure prevent the HTTP server
@@ -14,6 +15,8 @@ async function main(): Promise<void> {
   if (isDatabaseConnected()) {
     // Only seed / sync when the database is actually reachable.
     await ensureDefaultMachine();
+    // Ensure Alert indexes (including partial unique index) exist before first request
+    await Alert.init();
     // Start rollup scheduler for historical data aggregation
     await startRollupScheduler();
   } else {

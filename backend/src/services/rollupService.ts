@@ -6,6 +6,11 @@
  *
  * Raw data remains queryable (paginated/limited) via /sensor-data/historical.
  * Rollups are used when the requested time range exceeds ~1 hour of raw data.
+ *
+ * NOTE: `date` is stored as Unix epoch milliseconds (number), not a Date object.
+ * Bucket boundaries are computed in Node.js from the epoch ms number, and rolled-up
+ * documents store their bucket timestamp as an epoch ms number (not a Date) so that
+ * historical queries never hit a Date/number type mismatch one layer up.
  */
 
 import { SensorReading } from '../models/SensorReading';
@@ -16,67 +21,82 @@ const MINUTE_COLLECTION = 'sensorReadingMinute';
 const HOUR_COLLECTION = 'sensorReadingHour';
 const DAY_COLLECTION = 'sensorReadingDay';
 
-function truncateToMinute(date: Date): Date {
-  const d = new Date(date);
-  d.setSeconds(0, 0);
-  return d;
+const MS_PER_MINUTE = 60_000;
+const MS_PER_HOUR = 3_600_000;
+const MS_PER_DAY = 86_400_000;
+const SHANGHAI_OFFSET_MS = 28_800_000;
+
+/**
+ * Truncate an epoch-ms timestamp to the start of its UTC minute.
+ */
+function truncateToMinute(epochMs: number): number {
+  return Math.floor(epochMs / MS_PER_MINUTE) * MS_PER_MINUTE;
 }
 
-function truncateToHour(date: Date): Date {
-  const d = new Date(date);
-  d.setMinutes(0, 0, 0);
-  return d;
+/**
+ * Truncate an epoch-ms timestamp to the start of its UTC hour.
+ */
+function truncateToHour(epochMs: number): number {
+  return Math.floor(epochMs / MS_PER_HOUR) * MS_PER_HOUR;
 }
 
-function truncateToDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+/**
+ * Truncate an epoch-ms timestamp to the start of its Asia/Shanghai day.
+ * Shanghai is UTC+8, so we shift by +8h before taking the day modulus.
+ */
+function truncateToDayShanghai(epochMs: number): number {
+  return epochMs - ((epochMs + SHANGHAI_OFFSET_MS) % MS_PER_DAY);
 }
 
-function buildIdFields(rangeDays: number): any {
+/**
+ * Build the $group _id fields using epoch-ms bucket boundaries instead of
+ * MongoDB date operators ($minute, $hour, $dayOfMonth, etc.), which only work
+ * on Date-typed fields.
+ */
+function buildIdFields(collectionName: string): any {
   const idFields: any = { machine: '$machine' };
-  if (rangeDays <= 1) {
-    idFields.minute = { $minute: '$date' };
-    idFields.hour = { $hour: '$date' };
-    idFields.day = { $dayOfMonth: '$date' };
-    idFields.month = { $month: '$date' };
-    idFields.year = { $year: '$date' };
-  } else if (rangeDays <= 30) {
-    idFields.hour = { $hour: '$date' };
-    idFields.day = { $dayOfMonth: '$date' };
-    idFields.month = { $month: '$date' };
-    idFields.year = { $year: '$date' };
+
+  if (collectionName === MINUTE_COLLECTION) {
+    idFields.bucket = {
+      $subtract: ['$date', { $mod: ['$date', MS_PER_MINUTE] }],
+    };
+  } else if (collectionName === HOUR_COLLECTION) {
+    idFields.bucket = {
+      $subtract: ['$date', { $mod: ['$date', MS_PER_HOUR] }],
+    };
   } else {
-    idFields.day = { $dayOfMonth: '$date' };
-    idFields.month = { $month: '$date' };
-    idFields.year = { $year: '$date' };
+    // DAY_COLLECTION — Asia/Shanghai day bucket
+    idFields.bucket = {
+      $subtract: [
+        '$date',
+        { $mod: [{ $add: ['$date', SHANGHAI_OFFSET_MS] }, MS_PER_DAY] },
+      ],
+    };
   }
+
   return idFields;
 }
 
-function buildMergeOn(idFields: any): string[] {
-  return Object.keys(idFields).filter((k) => k !== 'machine');
+function buildMergeOn(collectionName: string): string[] {
+  return ['machine', 'bucket'];
 }
 
 async function buildRollups(
   collectionName: string,
-  truncateFn: (date: Date) => Date,
-  startDate: Date,
-  endDate: Date
+  startMs: number,
+  endMs: number
 ): Promise<void> {
   const db = mongoose.connection.db;
   if (!db) return;
 
-  const rangeDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-  const idFields = buildIdFields(rangeDays);
-  const mergeOn = buildMergeOn(idFields);
+  const idFields = buildIdFields(collectionName);
+  const mergeOn = buildMergeOn(collectionName);
 
   const pipeline: any[] = [
     {
       $match: {
         machine: 'CMP-001',
-        date: { $gte: startDate, $lte: endDate },
+        date: { $gte: startMs, $lte: endMs },
       },
     },
     {
@@ -91,6 +111,26 @@ async function buildRollups(
         count: { $sum: 1 },
         firstReading: { $min: '$date' },
         lastReading: { $max: '$date' },
+      },
+    },
+    {
+      // Hoist the composite _id {machine, bucket} to top-level fields: $merge
+      // `on: ['machine', 'bucket']` matches against TOP-LEVEL document fields,
+      // and the stored rollup documents are queried by top-level `machine` /
+      // `bucket` (see scripts/test-rollup.ts and historical queries).
+      $project: {
+        _id: 0,
+        machine: '$_id.machine',
+        bucket: '$_id.bucket',
+        avgTemperature: 1,
+        maxTemperature: 1,
+        minTemperature: 1,
+        avgVibration: 1,
+        maxVibration: 1,
+        minVibration: 1,
+        count: 1,
+        firstReading: 1,
+        lastReading: 1,
       },
     },
     {
@@ -109,22 +149,67 @@ async function buildRollups(
 export async function rollupReadings(): Promise<void> {
   if (!isDatabaseConnected()) return;
 
-  const endDate = new Date();
-  const startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000); // last 30 days
+  const endMs = Date.now();
+  const startMs = endMs - 30 * 24 * 60 * 60 * 1000; // last 30 days
 
   try {
-    await buildRollups(MINUTE_COLLECTION, truncateToMinute, startDate, endDate);
-    await buildRollups(HOUR_COLLECTION, truncateToHour, startDate, endDate);
-    await buildRollups(DAY_COLLECTION, truncateToDay, startDate, endDate);
+    await buildRollups(MINUTE_COLLECTION, startMs, endMs);
+    await buildRollups(HOUR_COLLECTION, startMs, endMs);
+    await buildRollups(DAY_COLLECTION, startMs, endMs);
     console.log('[rollup] Rollup aggregation completed');
   } catch (error) {
     console.error('[rollup] Rollup aggregation failed:', error);
   }
 }
 
+/**
+ * Backfill ALL history (not just a recent window) for all rollup collections,
+ * since the scheduler's 30-day window won't cover historical data that exists
+ * before the scheduler was started.
+ */
+export async function backfillAllHistory(): Promise<void> {
+  if (!isDatabaseConnected()) return;
+
+  const db = mongoose.connection.db;
+  if (!db) return;
+
+  // Get the full date range of existing data
+  const range = await db.collection('sensorreadings').aggregate([
+    {
+      $group: {
+        _id: null,
+        minDate: { $min: '$date' },
+        maxDate: { $max: '$date' },
+      },
+    },
+  ]).toArray();
+
+  if (range.length === 0) {
+    console.log('[rollup] No data to backfill.');
+    return;
+  }
+
+  const startMs = range[0].minDate;
+  const endMs = range[0].maxDate;
+
+  console.log(`[rollup] Backfilling all history from ${new Date(startMs).toISOString()} to ${new Date(endMs).toISOString()}`);
+
+  try {
+    await buildRollups(MINUTE_COLLECTION, startMs, endMs);
+    await buildRollups(HOUR_COLLECTION, startMs, endMs);
+    await buildRollups(DAY_COLLECTION, startMs, endMs);
+    console.log('[rollup] Full-history backfill completed');
+  } catch (error) {
+    console.error('[rollup] Full-history backfill failed:', error);
+  }
+}
+
 export async function startRollupScheduler(): Promise<void> {
   // Run initial rollup immediately
   await rollupReadings();
+
+  // Also backfill all history on first start (one-time)
+  await backfillAllHistory();
 
   // Then re-run every hour
   setInterval(rollupReadings, 60 * 60 * 1000);

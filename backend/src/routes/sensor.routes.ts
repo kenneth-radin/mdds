@@ -3,11 +3,17 @@ import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 import { ISensorReading } from '../models/SensorReading';
 import { SensorReading } from '../models/SensorReading';
+import { Alert } from '../models/Alert';
 import { requireAuth } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { asyncHandler } from '../middleware/error';
 // @ts-ignore - firebase-admin.js is a JS module without type declarations
 import { db } from '../firebase-admin';
+import { AnomalyDetector } from '../services/anomalyService';
+import { MachineState } from '../models/MachineState';
+
+import { DEFAULT_THRESHOLDS } from '../utils/helpers';
+import { getRecommendationForDetection } from '../services/recommendationTemplates';
 
 const route = Router();
 
@@ -15,7 +21,7 @@ const route = Router();
 const singleReadingSchema = z.object({
   temperature: z.number().min(-50).max(150),
   vibration: z.number().min(0).max(20),
-  timestamp: z.string().datetime().optional(),
+  timestamp: z.number().optional(), // Unix epoch milliseconds
   source: z.string().optional(),
 });
 
@@ -35,15 +41,15 @@ const HISTORICAL_RANGES = {
 
 type HistoricalRange = keyof typeof HISTORICAL_RANGES;
 
-function getRangeStart(range: HistoricalRange | undefined): Date | null {
+function getRangeStart(range: HistoricalRange | undefined): number | null {
   if (!range || !(range in HISTORICAL_RANGES)) return null;
   const spec = HISTORICAL_RANGES[range];
-  const now = new Date();
+  const now = Date.now();
   if ('hours' in spec) {
-    return new Date(now.getTime() - spec.hours * 60 * 60 * 1000);
+    return now - spec.hours * 60 * 60 * 1000;
   }
   if ('days' in spec) {
-    return new Date(now.getTime() - spec.days * 24 * 60 * 60 * 1000);
+    return now - spec.days * 24 * 60 * 60 * 1000;
   }
   return null;
 }
@@ -91,6 +97,10 @@ route.get('/sensor-data/history', asyncHandler(async (req, res) => {
 }));
 
 route.get('/sensor-data/stream', asyncHandler(async (_req, res) => {
+  // DEPRECATED: Use /sensor-data/historical with range parameter instead.
+  // This endpoint is kept for backward compatibility only.
+  res.setHeader('Deprecation', 'true');
+  res.setHeader('Link', '</sensor-data/historical?range=24h>; rel="deprecation"');
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -121,19 +131,19 @@ route.get('/sensor-data/historical', asyncHandler(async (req, res) => {
 
   res.json({
     range,
-    startDate: startDate?.toISOString() ?? null,
+    startDate,
     count: readings.length,
     readings: readings.map(r => singleReadingSchema.parse(r)),
   });
 }));
 
-route.post('/data', requireAuth, validateBody(batchReadingSchema), asyncHandler(async (req, res) => {
+route.post('/sensor-data/batch', requireAuth, validateBody(batchReadingSchema), asyncHandler(async (req, res) => {
   const body = req.body;
   const readings: Array<{
     temperature: number;
     vibration: number;
     operatingHours?: number;
-    timestamp?: string;
+    timestamp?: number; // Unix epoch milliseconds
     source?: string;
   }> = Array.isArray(body.readings) ? body.readings : [body];
   
@@ -146,7 +156,7 @@ route.post('/data', requireAuth, validateBody(batchReadingSchema), asyncHandler(
         temperature: item.temperature,
         vibration: item.vibration,
         operatingHours: item.operatingHours ?? 0,
-        date: item.timestamp ? new Date(item.timestamp) : new Date(),
+        date: item.timestamp ?? Date.now(),
         source: item.source || 'manual',
       });
       await reading.save();
@@ -172,7 +182,7 @@ route.post('/test', requireAuth, asyncHandler(async (req, res) => {
     temperature: body.temperature ?? 0,
     vibration: body.vibration ?? 0,
     operatingHours: body.operatingHours ?? 0,
-    date: body.date ? new Date(body.date) : new Date(),
+    date: body.date ?? Date.now(),
     source: body.source || 'manual',
   });
   await reading.save();
@@ -197,7 +207,7 @@ route.post('/test', requireAuth, asyncHandler(async (req, res) => {
 const deviceReadingSchema = z.object({
   temperature: z.number().min(-50).max(150),
   vibration: z.number().min(0).max(20),
-  timestamp: z.string().datetime().optional(),
+  timestamp: z.number().optional(), // Unix epoch milliseconds
   operatingHours: z.number().min(0).optional(),
   source: z.string().optional()
 });
@@ -211,11 +221,91 @@ route.post('/devices/readings', deviceIngestLimiter, requireDeviceKey, validateB
     temperature: body.temperature,
     vibration: body.vibration,
     operatingHours: body.operatingHours ?? 0,
-    date: body.timestamp ? new Date(body.timestamp) : new Date(),
+    date: body.timestamp ?? Date.now(),
     source: body.source || 'device',
     syncedToFirebase: true // optimistic; set to false below if Firebase push fails
   });
   await reading.save();
+
+  // --- State-aware anomaly gating (start/stop suspend detection) ---
+  const stateEntry = await MachineState.findOne({ machine })
+    .sort({ changedAt: -1 })
+    .lean() as { state?: string } | null;
+  // Fail-open default: a machine with no state entries yet behaves exactly as
+  // today - only actively tracked machines are suspended.
+  const effectiveState = stateEntry?.state ?? 'operating';
+
+  // detection is inferred from the real AnomalyDetector.analyze() return type
+  // (parameter/severity/score/trendSlope may be set or undefined) - the
+  // hand-written narrow type above was fighting the ML output.
+  let detection: any = null;
+
+  if (effectiveState === 'operating') {
+    // The rolling z-score baseline resets at the most recent 'operating'
+    // transition - pre-startup and stopped readings never pollute it.
+    const operatingEntry = await MachineState.findOne({ machine, state: 'operating' })
+      .sort({ changedAt: -1 })
+      .lean() as { changedAt: number } | null;
+    const historyQuery: Record<string, unknown> = { machine };
+    if (operatingEntry) {
+      historyQuery.date = { $gte: operatingEntry.changedAt };
+    }
+    const history = await SensorReading.find(historyQuery)
+      .sort({ date: -1 })
+      .limit(21)
+      .lean() as unknown as ISensorReading[];
+    const detector = new AnomalyDetector();
+    detection = detector.analyze(reading as ISensorReading, history as ISensorReading[], DEFAULT_THRESHOLDS);
+  }
+
+  // If anomaly detected, persist alert with duplicate suppression
+  if (effectiveState === 'operating' && detection?.anomaly) {
+    const { message, recommendation } = getRecommendationForDetection(
+      detection.parameter ?? null,
+      detection.severity,
+      detection.trendDirection ?? 'stable'
+    );
+
+    const alert = new Alert({
+      machine,
+      parameter: detection.parameter ?? null,
+      zScore: detection.score ?? null,
+      trendDirection: detection.trendDirection ?? null,
+      severity: detection.severity,
+      message: message || detection.reason || 'Sensor anomaly detected.',
+      recommendation: recommendation || detection.suggestion || 'Review sensor readings and machine condition — consult maintenance procedures.',
+      triggeredAt: reading.date,
+      resolved: false
+    });
+
+    try {
+      await alert.save();
+
+      // Push alert to Firebase immediately for near-real-time delivery
+      if (db) {
+        try {
+          await db.ref("alerts").push({
+            machine,
+            parameter: detection.parameter,
+            severity: detection.severity,
+            message: message || detection.reason || 'Sensor anomaly detected.',
+            recommendation: recommendation || detection.suggestion || 'Review sensor readings and machine condition — consult maintenance procedures.',
+            timestamp: reading.date,
+            source: "device"
+          });
+        } catch (error) {
+          console.error("[device-ingest] Firebase alert push failed:", error instanceof Error ? error.message : error);
+        }
+      }
+    } catch (error: any) {
+      // E11000 = duplicate key from partial unique index → alert was suppressed
+      if (error.code === 11000) {
+        console.log("[device-ingest] Duplicate alert suppressed (partial unique index):", error.message);
+      } else {
+        throw error;
+      }
+    }
+  }
 
   let firebasePushOk = false;
   if (db) {
@@ -223,7 +313,7 @@ route.post('/devices/readings', deviceIngestLimiter, requireDeviceKey, validateB
       await db.ref("sensorReadings").push({
         temperature: reading.temperature,
         vibration: reading.vibration,
-        timestamp: reading.date.toISOString(),
+        timestamp: reading.date, // Unix epoch milliseconds
         equipmentId: "CMP-001",
         source: reading.source
       });
@@ -244,7 +334,16 @@ route.post('/devices/readings', deviceIngestLimiter, requireDeviceKey, validateB
   res.status(200).json({
     ok: true,
     readingId: reading._id,
-    syncedToFirebase: firebasePushOk
+    syncedToFirebase: firebasePushOk,
+    machineState: effectiveState,
+    anomaly: (effectiveState === 'operating' && detection?.anomaly) ? {
+      severity: detection.severity,
+      parameter: detection.parameter,
+      reason: detection.reason,
+      recommendation: detection.reason, // same value stored as Alert.recommendation
+      score: detection.score,
+      trendDirection: detection.trendDirection
+    } : null
   });
 }));
 
