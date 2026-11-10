@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Integration test: Phases 1-4 against the REAL Express app over HTTP
  * (in-memory MongoDB).
  *
@@ -58,7 +58,12 @@ import { createApp } from '../src/app';
 import { Alert } from '../src/models/Alert';
 import { SensorReading } from '../src/models/SensorReading';
 import { MachineState } from '../src/models/MachineState';
-import { rollupReadings } from '../src/services/rollupService';
+import { Machine } from '../src/models/Machine';
+import { rollupReadings, buildRollups } from '../src/services/rollupService';
+
+const MINUTE_COLLECTION = 'sensorReadingMinute';
+const HOUR_COLLECTION = 'sensorReadingHour';
+const DAY_COLLECTION = 'sensorReadingDay';
 
 const MACHINE = 'CMP-001';
 const DEVICE_KEY = process.env.DEVICE_INGEST_KEY || '';
@@ -216,6 +221,159 @@ async function runPhase2(): Promise<void> {
   console.log(`[phase2] Minute buckets aligned to 60000ms, total rolled-up count=${totalRolledUp}`);
   console.log('[phase2] PASSED.');
 }
+// ---------- Phase 4: Date-typed and ObjectId-machine rollup test ---------- //
+async function runPhase4(): Promise<void> {
+  console.log('\\n=== PHASE 4: Date-Typed and ObjectId-Machine Rollups ===');
+
+  const now = Date.now();
+
+  // Isolate Phase 4 from prior phases: clear all raw readings and rollups so
+  // the 25 seeded rows below are the only inputs to this phase's assertions.
+  await SensorReading.deleteMany({});
+  const dbPrep = mongoose.connection.db!;
+  for (const col of [MINUTE_COLLECTION, HOUR_COLLECTION, DAY_COLLECTION]) {
+    await dbPrep.collection(col).deleteMany({});
+  }
+
+  // Seed a matching machines doc so ObjectId-machine readings resolve to 'CMP-001'.
+  const objectIdMachine = new mongoose.Types.ObjectId();
+  await Machine.create({
+    _id: objectIdMachine,
+    machineId: 'CMP-001',
+    name: 'Main Compressor',
+    machineType: 'Compressor',
+    manufacturer: '',
+    model: '',
+    serialNumber: '',
+    location: '',
+    criticality: 'high',
+    operatingHours: 1000,
+    notes: '',
+    createdBy: new mongoose.Types.ObjectId(),
+  });
+  console.log('[phase4] Seeded machines doc: _id=' + objectIdMachine + ' machineId=CMP-001');
+
+  // Insert via the NATIVE collection (not the Mongoose model) so the machine
+  // and date fields keep their exact legacy BSON types: the Mongoose model
+  // would cast ObjectId -> hex string and Date -> number, silently defeating
+  // this test. The native driver preserves the types we are exercising.
+  const rawCol = mongoose.connection.db!.collection('sensorreadings');
+
+  // 10 readings: string machine + numeric epoch-ms date
+  const numericDateReadings = [];
+  for (let i = 0; i < 10; i++) {
+    numericDateReadings.push({
+      machine: 'CMP-001',
+      date: now - i * 60 * 60 * 1000,
+      temperature: 70 + Math.random() * 10,
+      vibration: 1.0 + Math.random() * 2,
+      operatingHours: 1000 + i * 100,
+      source: 'test-numeric-date',
+      syncedToFirebase: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+  await rawCol.insertMany(numericDateReadings);
+
+  // 10 readings: ObjectId machine (legacy) + numeric epoch-ms date
+  const objectIdDateReadings = [];
+  for (let i = 0; i < 10; i++) {
+    objectIdDateReadings.push({
+      machine: objectIdMachine,
+      date: now - i * 60 * 60 * 1000,
+      temperature: 70 + Math.random() * 10,
+      vibration: 1.0 + Math.random() * 2,
+      operatingHours: 1000 + i * 100,
+      source: 'test-objectid-machine',
+      syncedToFirebase: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+  await rawCol.insertMany(objectIdDateReadings);
+
+  // 5 readings: string machine + BSON Date (legacy, pre-migration)
+  const dateObjReadings = [];
+  for (let i = 0; i < 5; i++) {
+    dateObjReadings.push({
+      machine: 'CMP-001',
+      date: new Date(now - i * 60 * 60 * 1000),
+      temperature: 70 + Math.random() * 10,
+      vibration: 1.0 + Math.random() * 2,
+      operatingHours: 1000 + i * 100,
+      source: 'test-date-obj',
+      syncedToFirebase: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+  await rawCol.insertMany(dateObjReadings);
+
+  // Sanity: the native insert preserved the legacy types we are testing.
+  const typedObjectId = await rawCol.countDocuments({ machine: objectIdMachine, source: 'test-objectid-machine' });
+  const stringMachine = await rawCol.countDocuments({ machine: 'CMP-001', source: 'test-numeric-date' });
+  const dateObjCount = await rawCol.countDocuments({ machine: 'CMP-001', source: 'test-date-obj', date: { $type: 'date' } });
+  console.log('[phase4] typed counts - objectid-machine=' + typedObjectId + ', string-machine=' + stringMachine + ', date-obj=' + dateObjCount);
+  expect(typedObjectId).toBe(10);
+  expect(stringMachine).toBe(10);
+  expect(dateObjCount).toBe(5);
+
+  const totalRaw = await SensorReading.countDocuments({ source: /^test-/ });
+  console.log('[phase4] Seeded ' + totalRaw + ' raw readings (numeric-date + objectid-machine + date-obj). Expected 25.');
+
+  // Ensure unique {machine, bucket} indexes exist on rollup collections for $merge.
+  const dbSetup = mongoose.connection.db!;
+  for (const col of [MINUTE_COLLECTION, HOUR_COLLECTION, DAY_COLLECTION]) {
+    await dbSetup.collection(col).createIndex({ machine: 1, bucket: 1 }, { unique: true });
+  }
+  console.log('[phase4] Unique {machine,bucket} indexes created on rollup collections');
+
+  const endMs = Date.now();
+  const startMs = endMs - 24 * 60 * 60 * 1000; // last 24 hours
+  await buildRollups(MINUTE_COLLECTION, startMs, endMs);
+  await buildRollups(HOUR_COLLECTION, startMs, endMs);
+  await buildRollups(DAY_COLLECTION, startMs, endMs);
+  console.log('[phase4] Rollup aggregation completed');
+
+  const db = mongoose.connection.db!;
+  const minuteDocs = await db.collection(MINUTE_COLLECTION).find({}).toArray();
+  const hourDocs = await db.collection(HOUR_COLLECTION).find({}).toArray();
+  const dayDocs = await db.collection(DAY_COLLECTION).find({}).toArray();
+
+  console.log('[phase4] Rollup docs - minute=' + minuteDocs.length + ', hour=' + hourDocs.length + ', day=' + dayDocs.length);
+
+  // Every rollup doc must carry the normalized string machine code 'CMP-001',
+  // never a raw ObjectId (both source forms must collapse to the same code).
+  for (const doc of [...minuteDocs, ...hourDocs, ...dayDocs]) {
+    expect(doc.machine).toBe('CMP-001');
+    expect(typeof doc.bucket).toBe('number');
+    expect(doc.count).toBeGreaterThan(0);
+    expect(typeof doc.firstReading).toBe('number');
+    expect(typeof doc.lastReading).toBe('number');
+  }
+
+  // Assert all three source forms (25 seeded readings) landed in the same buckets.
+  const totalMinute = minuteDocs.reduce((sum, d) => sum + d.count, 0);
+  const totalHour = hourDocs.reduce((sum, d) => sum + d.count, 0);
+  const totalDay = dayDocs.reduce((sum, d) => sum + d.count, 0);
+  console.log('[phase4] Sum of count: minute=' + totalMinute + ', hour=' + totalHour + ', day=' + totalDay);
+  expect(totalMinute).toBe(25);
+  expect(totalHour).toBe(25);
+  expect(totalDay).toBe(25);
+
+  // There must be exactly one normalized machine across the minute buckets.
+  const distinctMachines = [...new Set(minuteDocs.map((d) => String(d.machine)))];
+  console.log('[phase4] Distinct normalized machine values: ' + JSON.stringify(distinctMachines));
+  expect(distinctMachines).toEqual(['CMP-001']);
+
+  // Cleanup: remove Phase 4 seed data and the machines doc.
+  await SensorReading.deleteMany({ source: /^test-/ });
+  await Machine.deleteMany({ _id: objectIdMachine });
+  console.log('[phase4] Cleaned up seed data and machines doc');
+
+  console.log('[phase4] PASSED.');
+}
 // ---------- State flagging + Phase 3: state-machine gating of alerts ---------- //
 async function runPhase3(): Promise<void> {
   console.log('\n=== PHASE 3: State-Machine Gating of Alerts ===');
@@ -341,6 +499,10 @@ describe('Integration: Phases 1-4 (real Express app over HTTP, in-memory Mongo)'
 
   it('Phase 3: state-machine gating of alerts with Firebase assertions', async () => {
     await runPhase3();
+  });
+
+  it('Phase 4: Date-typed and ObjectId-machine rollups', async () => {
+    await runPhase4();
   });
 });
 

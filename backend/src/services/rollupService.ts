@@ -103,7 +103,7 @@ async function ensureRollupIndexes(): Promise<void> {
   }
 }
 
-async function buildRollups(
+export async function buildRollups(
   collectionName: string,
   startMs: number,
   endMs: number
@@ -116,12 +116,46 @@ async function buildRollups(
 
   const pipeline: any[] = [
     {
+      // Only roll up documents whose `date` is a BSON Date or a number. This
+      // guard keeps the $toLong / $mod bucket arithmetic below from ever
+      // failing on string/missing/other values.
       $match: {
-        machine: 'CMP-001',
-        // Skip documents whose `date` is neither a BSON Date nor numeric, so
-        // the $toLong / $mod bucket arithmetic below can never fail on
-        // string/missing/other values.
-        date: { $gte: startMs, $lte: endMs, $type: ['date', 'number'] },
+        date: { $type: ['date', 'number'] },
+      },
+    },
+    {
+      // Normalize date to an epoch-ms number so range matching and bucketing
+      // are type-safe for both BSON Date (legacy data) and numeric dates.
+      $addFields: {
+        dateMs: { $toLong: '$date' },
+      },
+    },
+    {
+      $match: {
+        dateMs: { $gte: startMs, $lte: endMs },
+      },
+    },
+    {
+      // Normalize `machine` to the string machine code for BOTH source forms:
+      //   - ObjectId → resolve via `machines` by _id to the doc's `machineId`
+      //   - string   → unchanged ($toString of a string is a no-op)
+      // Rollups therefore always carry 'CMP-001' instead of a raw ObjectId.
+      $lookup: {
+        from: 'machines',
+        localField: 'machine',
+        foreignField: '_id',
+        as: 'machineLookup',
+      },
+    },
+    {
+      $addFields: {
+        machine: {
+          $cond: [
+            { $gt: [{ $size: '$machineLookup' }, 0] },
+            { $arrayElemAt: ['$machineLookup.machineId', 0] },
+            { $toString: '$machine' },
+          ],
+        },
       },
     },
     {
@@ -134,8 +168,8 @@ async function buildRollups(
         maxVibration: { $max: '$vibration' },
         minVibration: { $min: '$vibration' },
         count: { $sum: 1 },
-        firstReading: { $min: '$date' },
-        lastReading: { $max: '$date' },
+        firstReading: { $min: '$dateMs' },
+        lastReading: { $max: '$dateMs' },
       },
     },
     {
@@ -200,13 +234,15 @@ export async function backfillAllHistory(): Promise<void> {
   const db = mongoose.connection.db;
   if (!db) return;
 
-  // Get the full date range of existing data
+  // Get the full date range of existing data as numeric epoch-ms bounds, so
+  // the $match below can compare against a numeric `dateMs` regardless of
+  // whether `date` is stored as a BSON Date or a number.
   const range = await db.collection('sensorreadings').aggregate([
     {
       $group: {
         _id: null,
-        minDate: { $min: '$date' },
-        maxDate: { $max: '$date' },
+        minDate: { $min: { $toLong: '$date' } },
+        maxDate: { $max: { $toLong: '$date' } },
       },
     },
   ]).toArray();
