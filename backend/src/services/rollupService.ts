@@ -61,20 +61,23 @@ function truncateToDayShanghai(epochMs: number): number {
 function buildIdFields(collectionName: string): any {
   const idFields: any = { machine: '$machine' };
 
+  // `date` may be a BSON Date (legacy data) or an epoch-ms number. Wrap it
+  // with $toLong so bucketing arithmetic always operates on numeric
+  // milliseconds: $mod and $add reject Date operands.
   if (collectionName === MINUTE_COLLECTION) {
     idFields.bucket = {
-      $subtract: ['$date', { $mod: ['$date', MS_PER_MINUTE] }],
+      $subtract: [{ $toLong: '$date' }, { $mod: [{ $toLong: '$date' }, MS_PER_MINUTE] }],
     };
   } else if (collectionName === HOUR_COLLECTION) {
     idFields.bucket = {
-      $subtract: ['$date', { $mod: ['$date', MS_PER_HOUR] }],
+      $subtract: [{ $toLong: '$date' }, { $mod: [{ $toLong: '$date' }, MS_PER_HOUR] }],
     };
   } else {
     // DAY_COLLECTION — Asia/Shanghai day bucket
     idFields.bucket = {
       $subtract: [
-        '$date',
-        { $mod: [{ $add: ['$date', SHANGHAI_OFFSET_MS] }, MS_PER_DAY] },
+        { $toLong: '$date' },
+        { $mod: [{ $add: [{ $toLong: '$date' }, SHANGHAI_OFFSET_MS] }, MS_PER_DAY] },
       ],
     };
   }
@@ -115,7 +118,10 @@ async function buildRollups(
     {
       $match: {
         machine: 'CMP-001',
-        date: { $gte: startMs, $lte: endMs },
+        // Skip documents whose `date` is neither a BSON Date nor numeric, so
+        // the $toLong / $mod bucket arithmetic below can never fail on
+        // string/missing/other values.
+        date: { $gte: startMs, $lte: endMs, $type: ['date', 'number'] },
       },
     },
     {
@@ -215,13 +221,16 @@ export async function backfillAllHistory(): Promise<void> {
 
   console.log(`[rollup] Backfilling all history from ${new Date(startMs).toISOString()} to ${new Date(endMs).toISOString()}`);
 
+  let failedStage = 'minute';
   try {
     await buildRollups(MINUTE_COLLECTION, startMs, endMs);
+    failedStage = 'hour';
     await buildRollups(HOUR_COLLECTION, startMs, endMs);
+    failedStage = 'day';
     await buildRollups(DAY_COLLECTION, startMs, endMs);
     console.log('[rollup] Full-history backfill completed');
   } catch (error) {
-    console.error('[rollup] Full-history backfill failed:', error);
+    console.error(`[rollup] Full-history backfill failed at ${failedStage} stage:`, error);
   }
 }
 
