@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+﻿import React, { useCallback, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   Button,
@@ -13,6 +13,7 @@ import {
   SectionHeader
 } from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
+import { DEFAULT_MACHINE_ID } from '../../../lib/config';
 import { Machine, MaintenanceCase } from '../../../lib/types';
 import { splitCsv } from '../../../lib/format';
 
@@ -85,8 +86,8 @@ export default function NewCaseScreen() {
         <EmptyState
           icon="construct-outline"
           title="No machines registered yet"
-          message="The compressor CMP-001 is seeded by the backend on startup. Create a case for it below."
-          action={{ title: 'Open compressor', onPress: () => router.push('/(app)/(tabs)/machines') }}
+          message={`The machine ${DEFAULT_MACHINE_ID} is seeded by the backend on startup. Create a case for it below.`}
+          action={{ title: 'Open machine', onPress: () => router.push('/(app)/(tabs)/machines') }}
         />
       ) : (
         <>
@@ -154,3 +155,4 @@ export default function NewCaseScreen() {
     </Screen>
   );
 }
+

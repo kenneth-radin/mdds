@@ -17,6 +17,7 @@ import {
   theme
 } from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
+import { DEFAULT_MACHINE_ID } from '../../../lib/config';
 import { Machine } from '../../../lib/types';
 import { fmtDate } from '../../../lib/format';
 
@@ -88,7 +89,7 @@ export default function MachinesScreen() {
           message={
             search.trim()
               ? 'Try a shorter search term, or clear the search box to list every machine.'
-              : 'The single compressor CMP-001 is seeded by the backend on startup.'
+              : `The single machine ${DEFAULT_MACHINE_ID} is seeded by the backend on startup.`
           }
         />
       ) : null}

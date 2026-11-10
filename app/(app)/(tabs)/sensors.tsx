@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import {
@@ -16,6 +16,9 @@ import {
   theme,
 } from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
+import { fmtDate, fmtDateTime, fmtNumber } from '../../../lib/format';
+import { DEFAULT_MACHINE_ID } from '../../../lib/config';
+import { machineStateApi, type MachineState } from '../../../lib/api/machineState';
 import { SensorReading } from '../../../lib/types';
 
 const REFRESH_INTERVAL_MS = 5000;
@@ -32,9 +35,17 @@ export default function SensorsScreen() {
   const [history, setHistory] = useState<SensorReading[]>([]);
   const [historical, setHistorical] = useState<SensorReading[]>([]);
   const [selectedRange, setSelectedRange] = useState<string>('24h');
+
   const [loading, setLoading] = useState(true);
-  const [historicalLoading, setHistoricalLoading] = useState(false);
   const [error, setError] = useState('');
+  const [historicalLoading, setHistoricalLoading] = useState(false);
+
+  const [machineState, setMachineState] = useState<Array<{
+    state: MachineState;
+    changedAt: number;
+    changedBy: string | null;
+  }>>([]);
+
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadLatest = useCallback(async () => {
@@ -68,6 +79,23 @@ export default function SensorsScreen() {
         count: number;
         readings: SensorReading[];
       }>(`/api/sensor-data/historical?range=${selectedRange}&limit=500`);
+
+      // Fetch state transitions for the same visible time range so we can
+      // shunt each reading onto the correct state bucket.
+      const now = Date.now();
+      const from = data.startDate ? new Date(data.startDate).getTime() : now - 7 * 86400000;
+      try {
+        const stateRes = await machineStateApi.getHistory(DEFAULT_MACHINE_ID, {
+          limit: 100,
+          from,
+          to: now,
+        });
+        const sortedStates = [...stateRes.history].sort((a, b) => b.changedAt - a.changedAt);
+        setMachineState(sortedStates);
+      } catch (stateErr) {
+        console.warn('[sensors.tsx] Failed to fetch machine state history:', stateErr);
+      }
+
       setHistorical(data.readings);
     } catch {
       // Historical failure is non-fatal.
@@ -96,7 +124,7 @@ export default function SensorsScreen() {
     <Screen>
       <ScreenHeader
         title="Sensors"
-        subtitle="Live temperature & vibration from the compressor"
+        subtitle="Live temperature & vibration from the machine"
         badge={
           <Chip
             label={isOnline ? 'Online' : 'Offline'}
@@ -111,7 +139,7 @@ export default function SensorsScreen() {
       ) : null}
 
       {loading && !reading ? (
-        <Loading label="Loading sensor data…" caption="Waiting for the ESP32 device." />
+        <Loading label="Loading sensor dataâ€¦" caption="Waiting for the ESP32 device." />
       ) : null}
 
       {!loading && !reading ? (
@@ -126,22 +154,22 @@ export default function SensorsScreen() {
         <>
           <SectionHeader
             title="Current reading"
-            subtitle={`Last updated ${new Date(reading.date).toLocaleTimeString()}`}
+            subtitle={`Last updated ${fmtDateTime(reading.date)}`}
             icon="timer-outline"
           />
 
           <View style={st.statRow}>
             <StatCard
               label="Temperature"
-              value={`${reading.temperature.toFixed(1)} °C`}
+              value={`${fmtNumber(reading.temperature, 1)} Â°C`}
               hint="DHT11 sensor"
               icon="thermometer-outline"
               tone="warning"
             />
             <StatCard
               label="Vibration"
-              value={`${reading.vibration.toFixed(1)}`}
-              hint="Analog sensor (0–20)"
+              value={`${fmtNumber(reading.vibration)}`}
+              hint="Analog sensor (0â€“20)"
               icon="speedometer-outline"
               tone={reading.vibration > 12 ? 'warning' : 'primary'}
             />
@@ -157,9 +185,9 @@ export default function SensorsScreen() {
                   </Text>
                   <View style={st.historyValues}>
                     <Text style={st.historyLabel}>Temp:</Text>
-                    <Text style={st.historyValue}>{r.temperature.toFixed(1)} °C</Text>
+                    <Text style={st.historyValue}>{fmtNumber(r.temperature, 1)} °C</Text>
                     <Text style={st.historyLabel}>Vib:</Text>
-                    <Text style={st.historyValue}>{r.vibration.toFixed(1)}</Text>
+                    <Text style={st.historyValue}>{fmtNumber(r.vibration)}</Text>
                     <Muted style={st.historySource}>{r.source}</Muted>
                   </View>
                   <Chip
@@ -200,31 +228,36 @@ export default function SensorsScreen() {
               }
             />
             {historicalLoading ? (
-              <Loading label="Loading history…" caption="Fetching historical readings." />
+              <Loading label="Loading historyâ€¦" caption="Fetching historical readings." />
             ) : historical.length === 0 ? (
               <Muted style={st.noHistory}>
                 No historical data for the selected range. Ensure the ESP32 is sending readings.
               </Muted>
             ) : (
               <View style={st.historyList}>
-                {historical.map((r) => (
-                  <View key={r._id} style={st.historyRow}>
+                {historical.map((r) => {
+                  const activeState = machineState.filter(t => t.changedAt <= r.date)
+                    .sort((a, b) => b.changedAt - a.changedAt)[0]?.state ?? null;
+                  const bgColor = activeState === 'starting' ? 'rgba(251, 191, 36, 0.15)' :
+                                  activeState === 'stopped' ? 'rgba(100, 116, 139, 0.15)' : undefined;
+                  return (
+                    <View key={r._id} style={[st.historyRow, { backgroundColor: bgColor }]}>
                     <Text style={st.historyTime}>
-                      {new Date(r.date).toLocaleString([], {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {fmtDateTime(r.date)}
+                    </Text>
+                    <Text style={st.historyState}>
+                      {activeState === 'starting' ? 'Starting' :
+                       activeState === 'stopped' ? 'Stopped' : 'Operating'}
                     </Text>
                     <View style={st.historyValues}>
                       <Text style={st.historyLabel}>Temp:</Text>
-                      <Text style={st.historyValue}>{r.temperature.toFixed(1)} °C</Text>
+                      <Text style={st.historyValue}>{fmtNumber(r.temperature, 1)} °C</Text>
                       <Text style={st.historyLabel}>Vib:</Text>
-                      <Text style={st.historyValue}>{r.vibration.toFixed(1)}</Text>
+                      <Text style={st.historyValue}>{fmtNumber(r.vibration)}</Text>
                     </View>
                   </View>
-                ))}
+                );
+              })}
               </View>
             )}
           </Card>
@@ -260,6 +293,11 @@ const st = StyleSheet.create({
     paddingHorizontal: theme.space.sm,
     borderBottomWidth: 1,
     borderBottomColor: theme.divider,
+  },
+  historyState: {
+    ...theme.font.caption,
+    color: theme.textMuted,
+    fontWeight: '600' as const,
   },
   historyTime: {
     ...theme.font.captionMedium,
@@ -300,3 +338,6 @@ const st = StyleSheet.create({
     alignItems: 'center',
   },
 });
+
+
+

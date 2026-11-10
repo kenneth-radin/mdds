@@ -18,6 +18,7 @@ import {
   theme
 } from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
+import { DEFAULT_MACHINE_ID } from '../../../lib/config';
 import { Machine, TestingCase } from '../../../lib/types';
 import { fmtDateTime } from '../../../lib/format';
 
@@ -118,7 +119,7 @@ export default function TestingScreen() {
         <EmptyState
           icon="construct-outline"
           title="No machines registered yet"
-          message="The compressor CMP-001 is seeded by the backend on startup. Record a testing case for it."
+          message={`The machine ${DEFAULT_MACHINE_ID} is seeded by the backend on startup. Record a testing case for it.`}
         />
       ) : (
         <Card>
