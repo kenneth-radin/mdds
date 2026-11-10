@@ -21,6 +21,7 @@ const route = Router();
 const singleReadingSchema = z.object({
   temperature: z.number().min(-50).max(150),
   vibration: z.number().min(0).max(20),
+  humidity: z.number().min(0).max(100).optional(),
   timestamp: z.number().optional(), // Unix epoch milliseconds
   source: z.string().optional(),
 });
@@ -207,6 +208,7 @@ route.post('/test', requireAuth, asyncHandler(async (req, res) => {
 const deviceReadingSchema = z.object({
   temperature: z.number().min(-50).max(150),
   vibration: z.number().min(0).max(20),
+  humidity: z.number().min(0).max(100).optional(),
   timestamp: z.number().optional(), // Unix epoch milliseconds
   operatingHours: z.number().min(0).optional(),
   source: z.string().optional()
@@ -220,6 +222,7 @@ route.post('/devices/readings', deviceIngestLimiter, requireDeviceKey, validateB
     machine,
     temperature: body.temperature,
     vibration: body.vibration,
+    humidity: body.humidity,
     operatingHours: body.operatingHours ?? 0,
     date: body.timestamp ?? Date.now(),
     source: body.source || 'device',

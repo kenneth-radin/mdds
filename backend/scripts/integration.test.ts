@@ -82,11 +82,11 @@ function pushesTo(refPath: string) {
   return mockPush.mock.calls.filter((c) => c[0] === refPath);
 }
 
-async function postDeviceReading(temperature: number, vibration: number, timestamp: number) {
+async function postDeviceReading(temperature: number, vibration: number, timestamp: number, humidity?: number) {
   return request(app)
     .post('/api/devices/readings')
     .set('X-Device-Key', DEVICE_KEY)
-    .send({ temperature, vibration, timestamp });
+    .send({ temperature, vibration, timestamp, ...(humidity !== undefined ? { humidity } : {}) });
 }
 async function postState(state: string, changedBy?: string) {
   return request(app)
@@ -473,6 +473,41 @@ async function runPhase3(): Promise<void> {
   console.log('\n=== PHASE 3 COMPLETE ===');
 }
 
+// ---------- Phase 5: optional humidity field ---------- //
+async function runPhase5(): Promise<void> {
+  console.log('\n=== PHASE 5: Optional Humidity Field ===');
+  mockPush.mockClear();
+
+  const now = Date.now();
+
+  // Test A: POST with humidity -> stored and echoed with value.
+  const withHumidity = await postDeviceReading(24.0, 0.0, now, 55.4);
+  expect(withHumidity.status).toBe(200);
+  const storedWith = await SensorReading.findOne({ machine: MACHINE, date: now }).lean();
+  expect(storedWith).not.toBeNull();
+  expect(storedWith!.humidity).toBe(55.4);
+  console.log('[phase5/a] humidity stored:', storedWith!.humidity);
+
+  // Test B: POST without humidity -> stored with no humidity field.
+  const now2 = now + 1000;
+  const withoutHumidity = await postDeviceReading(25.0, 0.0, now2);
+  expect(withoutHumidity.status).toBe(200);
+  const storedWithout = await SensorReading.findOne({ machine: MACHINE, date: now2 }).lean();
+  expect(storedWithout).not.toBeNull();
+  expect(storedWithout!.humidity).toBeUndefined();
+  console.log('[phase5/b] no humidity stored:', storedWithout!.humidity);
+
+  // Test C: out-of-range humidity must be rejected (422).
+  const bad = await request(app)
+    .post('/api/devices/readings')
+    .set('X-Device-Key', DEVICE_KEY)
+    .send({ temperature: 25, vibration: 0, humidity: 150 });
+  expect(bad.status).toBe(422);
+  console.log('[phase5/c] out-of-range humidity rejected with', bad.status);
+
+  console.log('[phase5] PASSED.');
+}
+
 // ---------- Suite wiring ---------- //
 describe('Integration: Phases 1-4 (real Express app over HTTP, in-memory Mongo)', () => {
   beforeAll(async () => {
@@ -526,6 +561,10 @@ describe('Integration: Phases 1-4 (real Express app over HTTP, in-memory Mongo)'
 
   it('Phase 4: Date-typed and ObjectId-machine rollups', async () => {
     await runPhase4();
+  });
+
+  it('Phase 5: optional humidity field (with and without)', async () => {
+    await runPhase5();
   });
 });
 

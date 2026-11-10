@@ -13,6 +13,7 @@ export interface ISensorReading extends Document {
   date: number; // Unix epoch milliseconds
   temperature: number;
   vibration: number;
+  humidity?: number; // optional, percent 0-100 (DHT11)
   operatingHours: number;
   source: string;
   syncedToFirebase: boolean;
@@ -26,6 +27,7 @@ const sensorReadingSchema = new Schema<ISensorReading>(
     date: { type: Number, required: true, index: true },
     temperature: { type: Number, required: true, min: -50, max: 150 },
     vibration: { type: Number, required: true, min: 0, max: 20 },
+    humidity: { type: Number, min: 0, max: 100 },
     operatingHours: { type: Number, required: true, min: 0, default: 0 },
     source: { type: String, default: 'manual', trim: true },
     syncedToFirebase: { type: Boolean, default: false, index: true }

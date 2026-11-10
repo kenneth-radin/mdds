@@ -21,7 +21,19 @@ import mongoose from 'mongoose';
 export function createApp() {
   const app = express();
 
-  app.use(cors({ origin: env.corsOrigin === '*' ? true : env.corsOrigin.split(',') }));
+  // CORS: allow only the configured web origins (Vercel + localhost dev).
+  // Requests with no Origin header (native mobile apps, curl, server-to-server)
+  // are always allowed so the ESP32 / mobile app keep working.
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true); // no Origin = native/curl
+        if (env.corsOrigins.includes(origin)) return callback(null, true);
+        return callback(null, false);
+      },
+      credentials: true,
+    })
+  );
   app.use(express.json({ limit: '1mb' }));
   app.use(morgan('dev'));
 

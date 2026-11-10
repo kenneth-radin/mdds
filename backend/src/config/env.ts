@@ -17,5 +17,11 @@ export const env = {
   mongoUri: required('MONGODB_URI'),
   jwtSecret: required('JWT_SECRET'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  corsOrigin: process.env.CORS_ORIGIN || '*'
+  // Comma-separated list of allowed web origins (Vercel domain + localhost for
+  // dev). Native mobile requests send no Origin header and are always allowed.
+  // Defaults to localhost dev origins only — never a wildcard in production.
+  corsOrigins: (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:8081,http://localhost:19006')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
 };

@@ -18,9 +18,11 @@ services:
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 7d
-      # Mobile clients do not enforce CORS; tighten to a web origin if one is added later.
-      - key: CORS_ORIGIN
-        value: "*"
+      # Comma-separated allowed web origins (Vercel domain + localhost dev).
+      # Native mobile / ESP32 requests send no Origin header and are always allowed.
+      # Replace the Vercel domain with your actual deployment URL.
+      - key: CORS_ORIGINS
+        value: "https://your-mdss-app.vercel.app,http://localhost:3000,http://localhost:8081"
       # PORT is injected automatically by Render.
       - key: NODE_VERSION
         value: 22.14.0
