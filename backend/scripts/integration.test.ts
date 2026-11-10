@@ -104,15 +104,38 @@ async function getStateHistory() {
 
 async function setupMongoServer(): Promise<void> {
   console.log('[test] Starting in-memory MongoDB server...');
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
+  mongoServer = await MongoMemoryServer.create({
+    instance: { dbName: 'mdss_integration' },
+  });
+  const uri = mongoServer.getUri('mdss_integration');
   console.log(`[test] MongoDB URI: ${uri}`);
   process.env.MONGODB_URI = uri;
 }
 
 async function setupDatabase(): Promise<void> {
-  await mongoose.connect(mongoServer.getUri());
+  await mongoose.connect(mongoServer.getUri('mdss_integration'));
   const db = mongoose.connection.db!;
+  const dbName = db.databaseName;
+  console.log(`[test] Database name: ${dbName}`);
+
+  // Safety guard: never run against the shared Atlas "test" database (where
+  // real sensorreadings live). The in-memory server DB name is a random
+  // string, so "test" here would mean we accidentally pointed at Atlas.
+  if (dbName === 'test') {
+    throw new Error(
+      '[test] ABORT: connected to database "test" (real data). Refusing to run the integration suite against it.'
+    );
+  }
+
+  // Second guard: refuse to run if the target collection already contains
+  // documents this suite did not seed (i.e. it is not a fresh/reset DB).
+  const preExisting = await db.collection('sensorreadings').countDocuments({});
+  if (preExisting > 0) {
+    throw new Error(
+      `[test] ABORT: sensorreadings already has ${preExisting} document(s) before seeding. Expected an empty collection.`
+    );
+  }
+
   const collections = await db.listCollections().toArray();
   for (const col of collections) {
     await db.collection(col.name).drop().catch(() => {});
