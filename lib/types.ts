@@ -291,7 +291,7 @@ export interface MlPredictResponse {
 export interface SensorReading {
   _id: string;
   machine: string;
-  date: string;
+  date: number; // Unix epoch milliseconds
   temperature: number;
   vibration: number;
   operatingHours: number;

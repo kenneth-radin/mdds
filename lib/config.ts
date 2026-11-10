@@ -8,3 +8,7 @@ export const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:400
 
 export const REQUIRED_ENV_WARNING =
   'EXPO_PUBLIC_API_URL is not set. The app is using http://localhost:4000, which a physical phone cannot reach. Set it to your computer LAN IP or backend tunnel URL.';
+
+// TEMPORARY: single-machine assumption. Remove once machine selection/context is implemented.
+// Matches backend defaultMachineId in backend/src/routes/sensor.routes.ts.
+export const DEFAULT_MACHINE_ID = 'CMP-001';
