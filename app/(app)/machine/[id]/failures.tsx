@@ -13,6 +13,7 @@ import {
   Field,
   IconAction,
   KeyValue,
+  Loading,
   Notice,
   Screen,
   ScreenHeader,
@@ -173,15 +174,19 @@ export default function FailureRecordsScreen() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [loading, setLoading] = useState(true);
 
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const result = await api.get<{ records: FailureRecord[] }>(`/api/machines/${id}/failures`);
       setRecords(result.records);
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setLoading(false);
     }
   }, [id]);
 
@@ -279,6 +284,14 @@ export default function FailureRecordsScreen() {
       setRemovingId(null);
     }
   };
+
+  if (loading) {
+    return (
+      <Screen>
+        <Loading label="Loading failure records…" />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>

@@ -11,6 +11,7 @@ import {
   Field,
   IconAction,
   KeyValue,
+  Loading,
   Notice,
   Screen,
   ScreenHeader,
@@ -147,14 +148,18 @@ export default function OperationalDataScreen() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const result = await api.get<{ records: OperationalRecord[] }>(`/api/machines/${id}/operational-data`);
       setRecords(result.records);
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setLoading(false);
     }
   }, [id]);
 

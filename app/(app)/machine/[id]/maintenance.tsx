@@ -13,6 +13,7 @@ import {
   Field,
   IconAction,
   KeyValue,
+  Loading,
   Notice,
   Screen,
   ScreenHeader,
@@ -191,14 +192,18 @@ export default function MaintenanceHistoryScreen() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const result = await api.get<{ records: MaintenanceRecord[] }>(`/api/machines/${id}/maintenance`);
       setRecords(result.records);
     } catch (err) {
       setError(errorMessage(err));
+    } finally {
+      setLoading(false);
     }
   }, [id]);
 
@@ -296,6 +301,14 @@ export default function MaintenanceHistoryScreen() {
       setRemovingId(null);
     }
   };
+
+  if (loading) {
+    return (
+      <Screen>
+        <Loading label="Loading maintenance history…" />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
