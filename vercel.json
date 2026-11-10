@@ -1,13 +1,12 @@
 {
-  "buildCommand": "npm run build",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npx expo export -p web",
   "outputDirectory": "dist",
-  "framework": "vite",
   "installCommand": "npm install",
   "env": {
     "EXPO_PUBLIC_API_URL": "https://mdds.onrender.com"
   },
-  "routes": [
-    { "src": "/assets/(.*)", "dest": "/assets/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

@@ -294,6 +294,7 @@ export interface SensorReading {
   date: number; // Unix epoch milliseconds
   temperature: number;
   vibration: number;
+  humidity?: number; // optional, percent 0-100 (DHT11)
   operatingHours: number;
   source: string;
   syncedToFirebase: boolean;

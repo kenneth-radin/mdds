@@ -1,25 +1,31 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import {
   Button,
   Card,
   Chip,
   EmptyState,
-  Loading,
   Muted,
   Notice,
   Screen,
   ScreenHeader,
-  SectionHeader,
-  StatCard,
   theme,
 } from '../../../components/ui';
 import { api, errorMessage } from '../../../lib/api';
-import { fmtDate, fmtDateTime, fmtNumber } from '../../../lib/format';
+import { fmtDateTime, fmtNumber } from '../../../lib/format';
 import { DEFAULT_MACHINE_ID } from '../../../lib/config';
 import { machineStateApi, type MachineState } from '../../../lib/api/machineState';
 import { SensorReading } from '../../../lib/types';
+import {
+  StatCard,
+  StatusBadge,
+  SectionHeader,
+  LoadingSkeleton,
+  TrendChart,
+  ScreenContainer,
+} from '../../../src/components';
+import { useBrowserOnline } from '../../../src/components/useOnlineStatus';
 
 const REFRESH_INTERVAL_MS = 5000;
 const STALE_THRESHOLD_MS = 30000;
@@ -47,11 +53,13 @@ export default function SensorsScreen() {
   }>>([]);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const browserOnline = useBrowserOnline();
 
   const loadLatest = useCallback(async () => {
     try {
       const latest = await api.get<SensorReading | null>('/api/sensor-data/latest');
       setReading(latest);
+      setError('');
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -116,39 +124,59 @@ export default function SensorsScreen() {
     }, [loadLatest, loadHistory, loadHistorical])
   );
 
+  const refreshAll = useCallback(() => {
+    loadLatest();
+    loadHistory();
+    loadHistorical();
+  }, [loadLatest, loadHistory, loadHistorical]);
+
   const isOnline =
     !!reading &&
-    Date.now() - new Date(reading.date).getTime() < STALE_THRESHOLD_MS;
+    Date.now() - new Date(reading.date).getTime() < STALE_THRESHOLD_MS &&
+    browserOnline;
+
+  const trendPoints = [...history]
+    .reverse()
+    .map((r) => ({
+      label: new Date(r.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      value: r.temperature,
+    }));
 
   return (
     <Screen>
-      <ScreenHeader
-        title="Sensors"
-        subtitle="Live temperature & vibration from the machine"
-        badge={
-          <Chip
-            label={isOnline ? 'Online' : 'Offline'}
-            icon={isOnline ? 'wifi-outline' : 'alert-outline'}
-            tone={isOnline ? 'success' : 'warning'}
-          />
-        }
-      />
-
-      {error ? (
-        <Notice tone="danger" title="Could not load sensor data">{error}</Notice>
-      ) : null}
-
-      {loading && !reading ? (
-        <Loading label="Loading sensor dataâ€¦" caption="Waiting for the ESP32 device." />
-      ) : null}
-
-      {!loading && !reading ? (
-        <EmptyState
-          icon="thermometer-outline"
-          title="No sensor data yet"
-          message="The ESP32 device has not sent any readings. Make sure it is powered on and connected to Wi-Fi."
+      <ScreenContainer>
+        <ScreenHeader
+          title="Main Compressor"
+          subtitle={`${DEFAULT_MACHINE_ID} · Live temperature & vibration`}
+          badge={
+            <Chip
+              label={isOnline ? 'Online' : 'Offline'}
+              icon={isOnline ? 'wifi-outline' : 'alert-outline'}
+              tone={isOnline ? 'success' : 'warning'}
+            />
+          }
         />
-      ) : null}
+
+        {error ? (
+          <Notice tone="danger" title="Could not load sensor data">{error}</Notice>
+        ) : null}
+
+        {error && !loading ? (
+          <View style={st.retryWrap}>
+            <Button title="Retry" icon="refresh-outline" onPress={refreshAll} />
+          </View>
+        ) : null}
+
+        {loading && !reading ? <LoadingSkeleton count={3} /> : null}
+
+        {!loading && !reading && !error ? (
+          <EmptyState
+            icon="thermometer-outline"
+            title="No readings yet"
+            message="The ESP32 device has not sent any readings. Make sure it is powered on and connected to Wi-Fi."
+            action={{ title: 'Refresh', onPress: refreshAll }}
+          />
+        ) : null}
 
       {reading ? (
         <>
@@ -161,19 +189,39 @@ export default function SensorsScreen() {
           <View style={st.statRow}>
             <StatCard
               label="Temperature"
-              value={`${fmtNumber(reading.temperature, 1)} Â°C`}
+              value={fmtNumber(reading.temperature, 1)}
+              unit="°C"
               hint="DHT11 sensor"
               icon="thermometer-outline"
-              tone="warning"
             />
             <StatCard
               label="Vibration"
-              value={`${fmtNumber(reading.vibration)}`}
-              hint="Analog sensor (0â€“20)"
+              value={fmtNumber(reading.vibration)}
+              hint="0 = none · 5 = detected"
               icon="speedometer-outline"
-              tone={reading.vibration > 12 ? 'warning' : 'primary'}
+            />
+            <StatCard
+              label="Humidity"
+              value={reading.humidity != null ? fmtNumber(reading.humidity, 0) : '—'}
+              unit={reading.humidity != null ? '%' : undefined}
+              hint="DHT11 sensor"
+              icon="water-outline"
+            />
+            <StatCard
+              label="Last update"
+              value={new Date(reading.date).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+              hint={isOnline ? 'Receiving data' : 'Stale'}
+              icon="time-outline"
             />
           </View>
+
+          <Card>
+            <SectionHeader title="Temperature trend" icon="analytics-outline" />
+            <TrendChart title="" unit="°C" points={trendPoints} />
+          </Card>
 
           <Card tone="muted">
             <SectionHeader title="Recent readings" icon="timer-outline" />
@@ -190,10 +238,9 @@ export default function SensorsScreen() {
                     <Text style={st.historyValue}>{fmtNumber(r.vibration)}</Text>
                     <Muted style={st.historySource}>{r.source}</Muted>
                   </View>
-                  <Chip
+                  <StatusBadge
                     label={r.syncedToFirebase ? 'Synced' : 'Pending'}
-                    icon={r.syncedToFirebase ? 'checkmark-outline' : 'alert-outline'}
-                    tone="success"
+                    tone={r.syncedToFirebase ? 'success' : 'warning'}
                   />
                 </View>
               ))}
@@ -220,7 +267,7 @@ export default function SensorsScreen() {
                     >
                       <Chip
                         label={opt.label}
-                        tone={selectedRange === opt.value ? 'primary' : 'warning'}
+                        tone={selectedRange === opt.value ? 'primary' : 'default'}
                       />
                     </Pressable>
                   ))}
@@ -228,7 +275,7 @@ export default function SensorsScreen() {
               }
             />
             {historicalLoading ? (
-              <Loading label="Loading historyâ€¦" caption="Fetching historical readings." />
+              <LoadingSkeleton count={2} />
             ) : historical.length === 0 ? (
               <Muted style={st.noHistory}>
                 No historical data for the selected range. Ensure the ESP32 is sending readings.
@@ -265,13 +312,11 @@ export default function SensorsScreen() {
           <Button
             title="Refresh now"
             icon="refresh-outline"
-            onPress={() => {
-              loadLatest();
-              loadHistory();
-            }}
+            onPress={refreshAll}
           />
         </>
       ) : null}
+      </ScreenContainer>
     </Screen>
   );
 }
@@ -281,6 +326,9 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: theme.space.md,
+  },
+  retryWrap: {
+    marginBottom: theme.space.sm,
   },
   historyList: {
     paddingVertical: theme.space.sm,
