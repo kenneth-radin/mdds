@@ -14,6 +14,11 @@
  */
 
 import { SensorReading } from '../models/SensorReading';
+import {
+  SensorReadingMinute,
+  SensorReadingHour,
+  SensorReadingDay,
+} from '../models/Rollup';
 import mongoose from 'mongoose';
 import { connectDatabase, disconnectDatabase, isDatabaseConnected } from '../config/db';
 
@@ -79,6 +84,13 @@ function buildIdFields(collectionName: string): any {
 
 function buildMergeOn(collectionName: string): string[] {
   return ['machine', 'bucket'];
+}
+
+/** Ensure unique indexes exist on all rollup collections before $merge runs. */
+async function ensureRollupIndexes(): Promise<void> {
+  await SensorReadingMinute.createIndexes();
+  await SensorReadingHour.createIndexes();
+  await SensorReadingDay.createIndexes();
 }
 
 async function buildRollups(
@@ -148,6 +160,7 @@ async function buildRollups(
 
 export async function rollupReadings(): Promise<void> {
   if (!isDatabaseConnected()) return;
+  await ensureRollupIndexes();
 
   const endMs = Date.now();
   const startMs = endMs - 30 * 24 * 60 * 60 * 1000; // last 30 days
@@ -169,6 +182,7 @@ export async function rollupReadings(): Promise<void> {
  */
 export async function backfillAllHistory(): Promise<void> {
   if (!isDatabaseConnected()) return;
+  await ensureRollupIndexes();
 
   const db = mongoose.connection.db;
   if (!db) return;
