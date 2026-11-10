@@ -2,7 +2,7 @@
   "expo": {
     "name": "Maintenance Decision Support",
     "slug": "maintenance-decision-support",
-    "version": "1.0.0",
+    "version": "1.6.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "mdss",
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.plant.mdss",
-      "versionCode": 14
+      "versionCode": 15
     },
     "web": {
       "bundler": "metro"
