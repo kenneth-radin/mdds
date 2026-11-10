@@ -88,9 +88,16 @@ function buildMergeOn(collectionName: string): string[] {
 
 /** Ensure unique indexes exist on all rollup collections before $merge runs. */
 async function ensureRollupIndexes(): Promise<void> {
-  await SensorReadingMinute.createIndexes();
-  await SensorReadingHour.createIndexes();
-  await SensorReadingDay.createIndexes();
+  try {
+    await SensorReadingMinute.createIndexes();
+    await SensorReadingHour.createIndexes();
+    await SensorReadingDay.createIndexes();
+  } catch (error) {
+    // A failed index build must never block API startup or crash the process.
+    // If the unique index truly cannot be built (e.g. duplicate data), the
+    // subsequent $merge will fail cleanly and is caught by the callers below.
+    console.error('[rollup] Failed to ensure rollup indexes:', error);
+  }
 }
 
 async function buildRollups(
