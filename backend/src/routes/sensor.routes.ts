@@ -24,7 +24,7 @@ const singleReadingSchema = z.object({
   humidity: z.number().min(0).max(100).optional(),
   timestamp: z.number().optional(), // Unix epoch milliseconds
   source: z.string().optional(),
-});
+}).passthrough();
 
 const batchReadingSchema = z.object({
   readings: z.array(singleReadingSchema),
