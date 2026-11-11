@@ -1,9 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { api, setAuthToken } from './api';
 import { AuthUser } from './types';
 
 const TOKEN_KEY = 'mdss.jwt';
+
+// SecureStore is not available on web. Fall back to localStorage so the token
+// (and therefore the session) survives page reloads in the Vercel build.
+const IS_WEB = Platform.OS === 'web';
 
 interface AuthState {
   status: 'loading' | 'signedOut' | 'signedIn';
@@ -25,6 +30,9 @@ const AuthContext = createContext<AuthState | undefined>(undefined);
 
 async function readToken(): Promise<string | null> {
   try {
+    if (IS_WEB) {
+      return typeof window !== 'undefined' ? window.localStorage.getItem(TOKEN_KEY) : null;
+    }
     return await SecureStore.getItemAsync(TOKEN_KEY);
   } catch {
     return null;
@@ -33,6 +41,12 @@ async function readToken(): Promise<string | null> {
 
 async function writeToken(token: string | null): Promise<void> {
   try {
+    if (IS_WEB) {
+      if (typeof window === 'undefined') return;
+      if (token) window.localStorage.setItem(TOKEN_KEY, token);
+      else window.localStorage.removeItem(TOKEN_KEY);
+      return;
+    }
     if (token) await SecureStore.setItemAsync(TOKEN_KEY, token);
     else await SecureStore.deleteItemAsync(TOKEN_KEY);
   } catch {
