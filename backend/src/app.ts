@@ -24,11 +24,16 @@ export function createApp() {
   // CORS: allow only the configured web origins (Vercel + localhost dev).
   // Requests with no Origin header (native mobile apps, curl, server-to-server)
   // are always allowed so the ESP32 / mobile app keep working.
+  // A literal '*' in the allowlist is treated as "allow all" so a stale
+  // CORS_ORIGIN=* from an older deploy keeps working rather than blocking
+  // every origin.
   app.use(
     cors({
       origin: (origin, callback) => {
         if (!origin) return callback(null, true); // no Origin = native/curl
-        if (env.corsOrigins.includes(origin)) return callback(null, true);
+        if (env.corsOrigins.includes('*') || env.corsOrigins.includes(origin)) {
+          return callback(null, true);
+        }
         return callback(null, false);
       },
       credentials: true,
