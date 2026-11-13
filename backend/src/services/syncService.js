@@ -16,7 +16,7 @@ async function syncLatestReading() {
     return;
   }
   try {
-    const latest = await SensorReading.findOne({ syncedToFirebase: { $ne: true } })
+    const latest = await SensorReading.findOne({ syncedToFirebase: { $ne: true }, seedTag: { $exists: false } })
       .sort({ date: -1 })
       .lean();
     
@@ -47,7 +47,8 @@ async function syncRecentReadings() {
     const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
     const readings = await SensorReading.find({
       $expr: { $gte: [{ $toLong: '$date' }, cutoffMs] },
-      syncedToFirebase: { $ne: true }
+      syncedToFirebase: { $ne: true },
+      seedTag: { $exists: false }
     }).sort({ date: -1 });
     
     const ref = admin.db.ref("sensorReadingsHistory");

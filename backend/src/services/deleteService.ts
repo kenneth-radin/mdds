@@ -39,21 +39,25 @@ export async function softDeleteMaintenanceCase(
   );
 
   // 3. Soft-delete the case
-  await MaintenanceCase.findByIdAndUpdate(caseId, {
+  const updatedDoc = await MaintenanceCase.findByIdAndUpdate(caseId, {
     $set: {
       isDeleted: true,
       deletedAt: new Date(),
     },
-  });
+  }, { new: true });
+
+  if (!updatedDoc) {
+    return { success: false, message: '404 Not Found' };
+  }
 
   return {
     success: true,
     message: 'Case soft-deleted successfully',
     case: {
-      _id: doc._id.toString(),
-      caseNumber: doc.caseNumber,
-      isDeleted: true,
-      deletedAt: doc.deletedAt || null,
+      _id: updatedDoc._id.toString(),
+      caseNumber: updatedDoc.caseNumber,
+      isDeleted: updatedDoc.isDeleted,
+      deletedAt: updatedDoc.deletedAt || null,
     },
   };
 }
