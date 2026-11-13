@@ -35,6 +35,7 @@ export interface ToastItem {
 }
 
 interface ToastContextValue {
+  toasts: ToastItem[];
   loadShownIds: () => Promise<void>;
   markAlertShown: (alertId: string, triggeredAt: number) => Promise<void>;
   removeToast: (alertId: string) => void;
@@ -111,6 +112,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider
       value={{
+        toasts,
         loadShownIds,
         markAlertShown,
         removeToast,

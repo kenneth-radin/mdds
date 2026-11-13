@@ -37,7 +37,7 @@ export function ToastBanner() {
   }, [removeToast]);
 
   // If no toasts, render nothing
-  if (toasts.length === 0) return null;
+  if (!toasts || toasts.length === 0) return null;
 
   return (
     <View style={styles.container}>
