@@ -3,8 +3,8 @@
 // Feeds unseen alerts into ToastContext for toast notification
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { api } from '../lib/api';
-import { isAlertNew, markAlertShown, removeToast, useToast } from '../lib/ToastContext';
+import { api } from '../../lib/api';
+import { isAlertNew, markAlertShown, removeToast, useToast } from './ToastContext';
 
 // Alert interface (matches backend response)
 export interface AlertItem {

@@ -2,9 +2,9 @@ import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../lib/auth';
-import { ToastProvider } from '../lib/ToastContext';
-import { ToastBanner } from '../components/ToastBanner';
-import { useAlertPolling, useBackgroundAwarePoller } from '../lib/alertPoller';
+import { ToastProvider } from './lib/ToastContext';
+import { ToastBanner } from './components/ToastBanner';
+import { useAlertPolling, useBackgroundAwarePoller } from './lib/alertPoller';
 
 function RootNavigator() {
   const { status } = useAuth();

@@ -14,9 +14,9 @@ import {
   ScreenHeader,
   SectionHeader,
   theme
-} from '../../components/ui';
-import { api, errorMessage } from '../../lib/api';
-import { AlertItem, AlertSummary } from '../../lib/types';
+} from '../../../../components/ui';
+import { api, errorMessage } from '../../../../lib/api';
+import { AlertItem, AlertSummary } from '../../../../lib/types';
 
 function severityTone(severity: AlertItem['severity']): 'info' | 'warning' | 'danger' {
   if (severity === 'critical') return 'danger';
