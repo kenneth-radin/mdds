@@ -14,6 +14,8 @@ import { MachineState } from '../models/MachineState';
 
 import { DEFAULT_THRESHOLDS } from '../utils/helpers';
 import { getRecommendationForDetection } from '../services/recommendationTemplates';
+import { computeTrendFeatures, classifyVibrationBand } from '../services/detectionFeatures';
+import { linkAlertToCases, attachLinksToAlert } from '../services/alertLinkService';
 
 const route = Router();
 
@@ -74,7 +76,7 @@ function requireDeviceKey(req: import('express').Request, res: import('express')
 }
 
 route.get('/sensor-data/latest', asyncHandler(async (_req, res) => {
-  const reading = await SensorReading.findOne({ machine: defaultMachineId })
+  const reading = await SensorReading.findOne({ machine: defaultMachineId, seedTag: { $exists: false } })
     .sort({ date: -1 })
     .lean() as ISensorReading | null;
   res.json(reading ? singleReadingSchema.parse(reading) : null);
@@ -82,7 +84,7 @@ route.get('/sensor-data/latest', asyncHandler(async (_req, res) => {
 
 route.get('/sensor-data/latest-by-machine', asyncHandler(async (req, res) => {
   const machineId = req.params.machineId || 'CMP-001';
-  const reading = await SensorReading.findOne({ machine: machineId })
+  const reading = await SensorReading.findOne({ machine: machineId, seedTag: { $exists: false } })
     .sort({ date: -1 })
     .lean() as ISensorReading | null;
   res.json(reading ? singleReadingSchema.parse(reading) : null);
@@ -105,7 +107,7 @@ route.get('/sensor-data/stream', asyncHandler(async (_req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
-  const reading = await SensorReading.findOne({ machine: defaultMachineId })
+  const reading = await SensorReading.findOne({ machine: defaultMachineId, seedTag: { $exists: false } })
     .sort({ date: -1 })
     .lean() as ISensorReading | null;
   if (reading) {
@@ -231,7 +233,7 @@ route.post('/devices/readings', deviceIngestLimiter, requireDeviceKey, validateB
   await reading.save();
 
   // --- State-aware anomaly gating (start/stop suspend detection) ---
-  const stateEntry = await MachineState.findOne({ machine })
+  const stateEntry = await MachineState.findOne({ machine, seedTag: { $exists: false } })
     .sort({ changedAt: -1 })
     .lean() as { state?: string } | null;
   // Fail-open default: a machine with no state entries yet behaves exactly as
@@ -242,14 +244,15 @@ route.post('/devices/readings', deviceIngestLimiter, requireDeviceKey, validateB
   // (parameter/severity/score/trendSlope may be set or undefined) - the
   // hand-written narrow type above was fighting the ML output.
   let detection: any = null;
+  let trendFeatures: { temperatureTrend: import('../services/detectionFeatures').TemperatureTrend; rapidRise: boolean } | null = null;
 
   if (effectiveState === 'operating') {
     // The rolling z-score baseline resets at the most recent 'operating'
     // transition - pre-startup and stopped readings never pollute it.
-    const operatingEntry = await MachineState.findOne({ machine, state: 'operating' })
+    const operatingEntry = await MachineState.findOne({ machine, state: 'operating', seedTag: { $exists: false } })
       .sort({ changedAt: -1 })
       .lean() as { changedAt: number } | null;
-    const historyQuery: Record<string, unknown> = { machine };
+    const historyQuery: Record<string, unknown> = { machine, seedTag: { $exists: false } };
     if (operatingEntry) {
       historyQuery.date = { $gte: operatingEntry.changedAt };
     }
@@ -259,15 +262,22 @@ route.post('/devices/readings', deviceIngestLimiter, requireDeviceKey, validateB
       .lean() as unknown as ISensorReading[];
     const detector = new AnomalyDetector();
     detection = detector.analyze(reading as ISensorReading, history as ISensorReading[], DEFAULT_THRESHOLDS);
+    // History above is newest-first (query sort); trend features need
+    // chronological order (oldest -> newest) with the current reading excluded.
+    const chronological = [...history].reverse().filter((h) => h.date < reading.date);
+    trendFeatures = computeTrendFeatures(
+      { temperature: reading.temperature, date: reading.date },
+      chronological.map((h) => ({ temperature: h.temperature, date: h.date }))
+    );
   }
 
   // If anomaly detected, persist alert with duplicate suppression
   if (effectiveState === 'operating' && detection?.anomaly) {
-    const { message, recommendation } = getRecommendationForDetection(
-      detection.parameter ?? null,
-      detection.severity,
-      detection.trendDirection ?? 'stable'
-    );
+    const vibBand = classifyVibrationBand(reading.vibration);
+    const { message, recommendation } = getRecommendationForDetection({
+      temperatureTrend: trendFeatures?.temperatureTrend ?? 'stable',
+      vibrationBand: vibBand,
+    });
 
     const alert = new Alert({
       machine,
@@ -283,6 +293,26 @@ route.post('/devices/readings', deviceIngestLimiter, requireDeviceKey, validateB
 
     try {
       await alert.save();
+
+      // Step 3: link the alert into the existing case/failure model.
+      try {
+        const links = await linkAlertToCases({
+          machineId: machine,
+          severity: detection.severity,
+          message: alert.message,
+          recommendation: alert.recommendation,
+          triggeredAt: reading.date,
+          symptom: detection.reason ?? `${reading.temperature}°C / vibration ${reading.vibration}`,
+        });
+        await attachLinksToAlert(alert._id, links);
+      } catch (linkError) {
+        // Linking is best-effort: an alert must never be lost because a case
+        // could not be created (e.g. system user missing in a fresh DB).
+        console.error(
+          '[device-ingest] Alert-to-case link failed:',
+          linkError instanceof Error ? linkError.message : linkError
+        );
+      }
 
       // Push alert to Firebase immediately for near-real-time delivery
       if (db) {

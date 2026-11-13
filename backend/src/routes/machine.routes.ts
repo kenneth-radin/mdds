@@ -35,7 +35,22 @@ const machineSchema = z.object({
   operatingHours: z.number().min(0).optional(),
   lastMaintenanceDate: dateString.nullable().optional(),
   recommendedMaintenanceIntervalDays: z.number().min(0).nullable().optional(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  // ---- HICON HZB-160F ice maker specification (step 8) ---- //
+  iceShape: z.string().optional(),
+  control: z.string().optional(),
+  powerW: z.number().nullable().optional(),
+  structure: z.string().optional(),
+  material: z.string().optional(),
+  application: z.string().optional(),
+  condensingMode: z.string().optional(),
+  filteringDevice: z.boolean().nullable().optional(),
+  autoCleaningDevice: z.boolean().nullable().optional(),
+  netWeightKg: z.number().nullable().optional(),
+  grossWeightKg: z.number().nullable().optional(),
+  specification: z.string().optional(),
+  trademark: z.string().optional(),
+  origin: z.string().optional()
 });
 
 router.get(

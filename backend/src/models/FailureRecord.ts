@@ -14,6 +14,8 @@ export interface IFailureRecord extends Document {
   correctiveAction: string;
   notes: string;
   createdBy: Types.ObjectId;
+  /** Optional tag for seeded/fabricated data so it can be cleaned idempotently. */
+  seedTag?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,7 +31,8 @@ const failureRecordSchema = new Schema<IFailureRecord>(
     downtimeHours: { type: Number, default: 0, min: 0 },
     correctiveAction: { type: String, default: '', trim: true },
     notes: { type: String, default: '', trim: true },
-    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    seedTag: { type: String, default: undefined, trim: true }
   },
   { timestamps: true }
 );

@@ -78,8 +78,8 @@ export interface IMaintenanceCase extends Document {
     recordedAt: Date | null;
   };
   linkedMaintenanceRecord: Types.ObjectId | null;
-  createdAt: Date;
-  updatedAt: Date;
+  deletedAt: Date | null;
+  isDeleted: boolean;
 }
 
 const emptyReview = () => ({
@@ -132,7 +132,9 @@ const maintenanceCaseSchema = new Schema<IMaintenanceCase>(
     review: { type: Schema.Types.Mixed, default: emptyReview },
     actualAction: { type: Schema.Types.Mixed, default: emptyAction },
     outcome: { type: Schema.Types.Mixed, default: emptyOutcome },
-    linkedMaintenanceRecord: { type: Schema.Types.ObjectId, ref: 'MaintenanceRecord', default: null }
+    linkedMaintenanceRecord: { type: Schema.Types.ObjectId, ref: 'MaintenanceRecord', default: null },
+    deletedAt: { type: Date, default: null, index: true },
+    isDeleted: { type: Boolean, default: false, index: true }
   },
   { timestamps: true, minimize: false }
 );

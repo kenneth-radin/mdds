@@ -35,7 +35,12 @@ export class ZScoreDetector {
       values.reduce((a, b) => a + b, 0) / values.length;
     const variance =
       values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length;
-    const std = Math.sqrt(variance) || 1; // avoid div by 0
+    // Floor the standard deviation at 1.0. A freshly-reset baseline (the first
+    // few operating readings after a startup) has near-zero variance, which
+    // would otherwise inflate z-scores to false-positive levels. The old
+    // `|| 1` only caught an exactly-zero variance; this guards tiny-but-nonzero
+    // variance too. This is a detector-stability floor, not data manipulation.
+    const std = Math.max(Math.sqrt(variance), 1.0);
     return { mean, std };
   }
 

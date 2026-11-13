@@ -11,6 +11,8 @@ export interface ITestingCase extends Document {
   matchScore: number | null;
   notes: string;
   createdBy: Types.ObjectId;
+  /** Optional tag for seeded/fabricated data so it can be cleaned idempotently. */
+  seedTag?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -25,7 +27,8 @@ const testingCaseSchema = new Schema<ITestingCase>(
     matched: { type: Boolean, required: true },
     matchScore: { type: Number, default: null },
     notes: { type: String, default: '', trim: true },
-    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    seedTag: { type: String, default: undefined, trim: true }
   },
   { timestamps: true }
 );

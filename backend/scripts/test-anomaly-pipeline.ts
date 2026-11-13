@@ -21,11 +21,10 @@ function makeReading(temperature: number, vibration: number, dateOffsetMin: numb
 let alerts: any[] = [];
 
 function simulateAlertCreate(reading: any, detection: any): { created: boolean; alert?: any; reason?: string } {
-  const { message, recommendation } = getRecommendationForDetection(
-    detection.parameter ?? null,
-    detection.severity,
-    detection.trendDirection ?? 'stable'
-  );
+  const { message, recommendation } = getRecommendationForDetection({
+    temperatureTrend: detection.trendDirection === 'decreasing' ? 'dropping' : detection.trendDirection === 'increasing' ? 'rising' : 'stable',
+    vibrationBand: reading.vibration >= 16 ? 'critical' : reading.vibration >= 11 ? 'moderate' : reading.vibration >= 5 ? 'normal' : 'idle',
+  });
   const existingAlert = alerts.find(
     (a) => a.machine === reading.machine && a.parameter === (detection.parameter ?? null) && a.severity === detection.severity && !a.resolved
   );

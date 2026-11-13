@@ -6,6 +6,8 @@ export interface IMachineState extends Document {
   state: 'starting' | 'operating' | 'stopped';
   changedAt: number;
   changedBy: string | null;
+  /** Optional tag for seeded/fabricated data so it can be cleaned idempotently. */
+  seedTag?: string;
 }
 
 const machineStateSchema = new Schema<IMachineState>(
@@ -18,6 +20,7 @@ const machineStateSchema = new Schema<IMachineState>(
     },
     changedAt: { type: Number, required: true, default: () => Date.now() },
     changedBy: { type: String, default: null, trim: true },
+    seedTag: { type: String, default: undefined, trim: true }
   },
   { timestamps: true }
 );

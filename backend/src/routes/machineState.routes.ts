@@ -30,7 +30,7 @@ router.get(
   '/machines/:machineId/state',
   asyncHandler(async (req, res) => {
     const machineId = String(req.params.machineId);
-    const current = await MachineState.findOne({ machine: machineId })
+    const current = await MachineState.findOne({ machine: machineId, seedTag: { $exists: false } })
       .sort({ changedAt: -1 })
       .lean();
     res.json({
@@ -81,7 +81,7 @@ router.post(
 
     // Dedupe: one log entry per state transition; holding the same button
     // recomputes the same transition without creating a duplicate row.
-    const latest = await MachineState.findOne({ machine: machineId })
+    const latest = await MachineState.findOne({ machine: machineId, seedTag: { $exists: false } })
       .sort({ changedAt: -1 })
       .lean();
     if (latest && latest.state === body.state) {

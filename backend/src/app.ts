@@ -7,8 +7,10 @@ import machineRoutes from './routes/machine.routes';
 import recordRoutes from './routes/record.routes';
 import sensorRoutes from './routes/sensor.routes';
 import machineStateRoutes from './routes/machineState.routes';
-import caseRoutes from './routes/case.routes';
+import caseRoutes from './routes/case.routes'
+import deleteRoutes from './routes/delete.routes';
 import caseReviewRoutes from './routes/caseReview.routes';
+import alertRoutes from './routes/alert.routes';
 import testingRoutes from './routes/testing.routes';
 import reportRoutes from './routes/report.routes';
 import mlRoutes from './routes/ml.routes';
@@ -68,7 +70,9 @@ export function createApp() {
   app.use('/api', machineRoutes);
   app.use('/api', recordRoutes);
   app.use('/api', caseRoutes);
+  app.use('/api', deleteRoutes);
   app.use('/api', caseReviewRoutes);
+  app.use('/api', alertRoutes);
   app.use('/api', testingRoutes);
   app.use('/api', reportRoutes);
   app.use('/api', mlRoutes);

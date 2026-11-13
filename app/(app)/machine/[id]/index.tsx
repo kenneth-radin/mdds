@@ -232,6 +232,36 @@ export default function MachineDetailScreen() {
                 : `${machine.recommendedMaintenanceIntervalDays} days`
             }
           />
+          <Divider />
+          <KeyValue label="Ice shape" value={machine.iceShape || '—'} />
+          <KeyValue label="Control" value={machine.control || '—'} />
+          <KeyValue
+            label="Power"
+            value={machine.powerW === null || machine.powerW === undefined ? '—' : `${machine.powerW} W`}
+          />
+          <KeyValue label="Structure" value={machine.structure || '—'} />
+          <KeyValue label="Material" value={machine.material || '—'} />
+          <KeyValue label="Application" value={machine.application || '—'} />
+          <KeyValue label="Condensing mode" value={machine.condensingMode || '—'} />
+          <KeyValue
+            label="Filtering device"
+            value={machine.filteringDevice === undefined || machine.filteringDevice === null ? '—' : machine.filteringDevice ? 'Yes' : 'No'}
+          />
+          <KeyValue
+            label="Automatic cleaning"
+            value={machine.autoCleaningDevice === undefined || machine.autoCleaningDevice === null ? '—' : machine.autoCleaningDevice ? 'Yes' : 'No'}
+          />
+          <KeyValue
+            label="Net / gross weight"
+            value={
+              machine.netWeightKg === null || machine.netWeightKg === undefined
+                ? '—'
+                : `${machine.netWeightKg} kg / ${machine.grossWeightKg ?? '—'} kg`
+            }
+          />
+          <KeyValue label="Specification" value={machine.specification || '—'} />
+          <KeyValue label="Trademark" value={machine.trademark || '—'} />
+          <KeyValue label="Origin" value={machine.origin || '—'} />
           {machine.notes ? (
             <>
               <Divider />

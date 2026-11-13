@@ -18,6 +18,14 @@ export interface IAlert extends Document {
   triggeredAt: number; // Unix epoch milliseconds
   resolved: boolean;
   resolvedAt: number | null; // Unix epoch milliseconds
+  // Optional forward-links into the existing case/failure/maintenance model
+  // (step 3). These never create a parallel structure — they point at the real
+  // MaintenanceCase / FailureRecord / MaintenanceRecord documents.
+  linkedMaintenanceCase: Types.ObjectId | null;
+  linkedFailureRecord: Types.ObjectId | null;
+  linkedMaintenanceRecord: Types.ObjectId | null;
+  /** Optional tag for seeded/fabricated data so it can be cleaned idempotently. */
+  seedTag?: string;
 }
 
 const alertSchema = new Schema<IAlert>(
@@ -31,7 +39,11 @@ const alertSchema = new Schema<IAlert>(
     recommendation: { type: String, required: true },
     triggeredAt: { type: Number, required: true, index: true },
     resolved: { type: Boolean, default: false, index: true },
-    resolvedAt: { type: Number, default: null }
+    resolvedAt: { type: Number, default: null },
+    linkedMaintenanceCase: { type: Schema.Types.ObjectId, ref: 'MaintenanceCase', default: null },
+    linkedFailureRecord: { type: Schema.Types.ObjectId, ref: 'FailureRecord', default: null },
+    linkedMaintenanceRecord: { type: Schema.Types.ObjectId, ref: 'MaintenanceRecord', default: null },
+    seedTag: { type: String, default: undefined, trim: true }
   },
   { timestamps: true }
 );

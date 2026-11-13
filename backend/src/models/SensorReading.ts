@@ -17,6 +17,8 @@ export interface ISensorReading extends Document {
   operatingHours: number;
   source: string;
   syncedToFirebase: boolean;
+  /** Optional tag for seeded/fabricated data so it can be cleaned idempotently. */
+  seedTag?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,7 +32,8 @@ const sensorReadingSchema = new Schema<ISensorReading>(
     humidity: { type: Number, min: 0, max: 100 },
     operatingHours: { type: Number, required: true, min: 0, default: 0 },
     source: { type: String, default: 'manual', trim: true },
-    syncedToFirebase: { type: Boolean, default: false, index: true }
+    syncedToFirebase: { type: Boolean, default: false, index: true },
+    seedTag: { type: String, default: undefined, trim: true }
   },
   { timestamps: true }
 );

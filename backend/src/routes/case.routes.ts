@@ -123,8 +123,7 @@ router.get(
     if (req.query.status) filter.status = String(req.query.status);
     const cases = await MaintenanceCase.find(filter)
       .populate('machine', 'machineId name machineType location')
-      .sort({ dateReported: -1 })
-      .lean();
+      .sort({ dateReported: -1 });
     res.json({ cases, count: cases.length });
   })
 );

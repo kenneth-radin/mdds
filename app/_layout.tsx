@@ -2,10 +2,10 @@ import React, { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../lib/auth';
+import { ToastProvider } from '../lib/ToastContext';
+import { ToastBanner } from '../components/ToastBanner';
+import { useAlertPolling, useBackgroundAwarePoller } from '../lib/alertPoller';
 
-// Auth guard: keeps the (auth) and (app) route groups in sync with the auth
-// status. Without this, a successful signIn/register leaves the user stuck on
-// the login screen because nothing navigates away from /(auth).
 function RootNavigator() {
   const { status } = useAuth();
   const segments = useSegments();
@@ -30,10 +30,24 @@ function RootNavigator() {
   );
 }
 
+// Root-level wrapper that mounts the global alert poller hooks
+// (hooks must be called at component top-level, not inside JSX)
+function GlobalAlertPoller() {
+  useAlertPolling();
+  useBackgroundAwarePoller();
+  return null;
+}
+
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <ToastProvider>
+        <RootNavigator />
+        {/* Root-level toast banner (absolute-positioned overlay) */}
+        <ToastBanner />
+        {/* Mount global alert poller at app root */}
+        <GlobalAlertPoller />
+      </ToastProvider>
     </AuthProvider>
   );
 }
